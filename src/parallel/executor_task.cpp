@@ -39,7 +39,7 @@ TaskExecutionResult ExecutorTask::Execute(TaskExecutionMode mode) {
 		if (thread_context) {
 			TaskExecutionResult result;
 			do {
-				TaskNotifier task_notifier {context};
+				TaskNotifier task_notifier {context, TaskType()};
 				thread_context->profiler.StartOperator(op);
 				// to allow continuous profiling, always execute in small steps
 				result = ExecuteTask(TaskExecutionMode::PROCESS_PARTIAL);
@@ -48,7 +48,7 @@ TaskExecutionResult ExecutorTask::Execute(TaskExecutionMode mode) {
 			} while (mode == TaskExecutionMode::PROCESS_ALL && result == TaskExecutionResult::TASK_NOT_FINISHED);
 			return result;
 		} else {
-			TaskNotifier task_notifier {context};
+			TaskNotifier task_notifier {context, TaskType()};
 			auto result = ExecuteTask(mode);
 			return result;
 		}

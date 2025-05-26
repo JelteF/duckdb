@@ -90,9 +90,9 @@ public:
 	}
 	virtual void WriteProfilingInformation(std::ostream &ss) {
 	}
-	virtual void OnTaskStart(ClientContext &context) {
+	virtual void OnTaskStart(ClientContext &context, const std::string &task_type) {
 	}
-	virtual void OnTaskStop(ClientContext &context) {
+	virtual void OnTaskStop(ClientContext &context, const std::string &task_type) {
 	}
 
 public:

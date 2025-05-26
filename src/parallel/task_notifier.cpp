@@ -4,10 +4,11 @@
 
 namespace duckdb {
 
-TaskNotifier::TaskNotifier(optional_ptr<ClientContext> context_p) : context(context_p) {
+TaskNotifier::TaskNotifier(optional_ptr<ClientContext> context_p, const std::string &_task_type)
+    : context(context_p), task_type(_task_type) {
 	if (context) {
 		for (auto &state : context->registered_state->States()) {
-			state->OnTaskStart(*context);
+			state->OnTaskStart(*context, task_type);
 		}
 	}
 }
@@ -15,7 +16,7 @@ TaskNotifier::TaskNotifier(optional_ptr<ClientContext> context_p) : context(cont
 TaskNotifier::~TaskNotifier() {
 	if (context) {
 		for (auto &state : context->registered_state->States()) {
-			state->OnTaskStop(*context);
+			state->OnTaskStop(*context, task_type);
 		}
 	}
 }
