@@ -123,6 +123,10 @@ const LogicalType &LogicalGet::GetColumnType(const ColumnIndex &index) const {
 	if (index.IsVirtualColumn()) {
 		auto entry = virtual_columns.find(index.GetPrimaryIndex());
 		if (entry == virtual_columns.end()) {
+			if (index.IsRowIdColumn()) {
+				static const LogicalType row_type = LogicalType::ROW_TYPE;
+				return row_type;
+			}
 			throw InternalException("Failed to find referenced virtual column %d", index.GetPrimaryIndex());
 		}
 		return entry->second.type;
@@ -134,6 +138,10 @@ const string &LogicalGet::GetColumnName(const ColumnIndex &index) const {
 	if (index.IsVirtualColumn()) {
 		auto entry = virtual_columns.find(index.GetPrimaryIndex());
 		if (entry == virtual_columns.end()) {
+			if (index.IsRowIdColumn()) {
+				static const string rowid_str = "rowid";
+				return rowid_str;
+			}
 			throw InternalException("Failed to find referenced virtual column %d", index.GetPrimaryIndex());
 		}
 		return entry->second.name;
@@ -282,7 +290,9 @@ unique_ptr<LogicalOperator> LogicalGet::Deserialize(Deserializer &deserializer) 
 			virtual_columns = function.get_virtual_columns(context, bind_data.get());
 		}
 		for (auto &col_id : result->column_ids) {
-			if (col_id.IsVirtualColumn()) {
+			if (col_id.IsRowIdColumn()) {
+				continue;
+			} else if (col_id.IsVirtualColumn()) {
 				auto idx = col_id.GetPrimaryIndex();
 				auto ventry = virtual_columns.find(idx);
 				if (ventry == virtual_columns.end()) {
