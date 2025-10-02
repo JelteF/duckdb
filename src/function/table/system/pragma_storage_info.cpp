@@ -9,6 +9,7 @@
 
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/limits.hpp"
+#include "duckdb/parallel/lock_notifier.hpp"
 #include "duckdb/storage/data_table.hpp"
 #include "duckdb/storage/table_storage_info.hpp"
 #include "duckdb/planner/binder.hpp"
@@ -88,6 +89,7 @@ static unique_ptr<FunctionData> PragmaStorageInfoBind(ClientContext &context, Ta
 	Binder::BindSchemaOrCatalog(context, qname.catalog, qname.schema);
 	auto &table_entry = Catalog::GetEntry<TableCatalogEntry>(context, qname.catalog, qname.schema, qname.name);
 	auto result = make_uniq<PragmaStorageFunctionData>(table_entry);
+	LockNotifier lock_notifier {context, "PragmaStorageInfo::TableLock"};
 	result->column_segments_info = table_entry.GetColumnSegmentInfo();
 	return std::move(result);
 }

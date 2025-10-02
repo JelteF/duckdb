@@ -7,6 +7,7 @@ add_library_unity(
   executor.cpp
   event.cpp
   interrupt.cpp
+  lock_notifier.cpp
   pipeline.cpp
   pipeline_complete_event.cpp
   pipeline_event.cpp

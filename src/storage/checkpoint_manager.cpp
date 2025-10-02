@@ -33,6 +33,7 @@
 #include "duckdb/catalog/dependency_manager.hpp"
 #include "duckdb/common/serializer/memory_stream.hpp"
 #include "duckdb/main/settings.hpp"
+#include "duckdb/parallel/lock_notifier.hpp"
 
 namespace duckdb {
 
@@ -540,7 +541,11 @@ void SingleFileCheckpointWriter::WriteTable(TableCatalogEntry &table, Serializer
 	serializer.WriteProperty(100, "table", &table);
 
 	// Write the table data
-	auto table_lock = table.GetStorage().GetCheckpointLock();
+	unique_ptr<StorageLockKey> table_lock;
+	{
+		LockNotifier lock_notifier {context, "SingleFileCheckpointWriter::TableLock"};
+		table_lock = table.GetStorage().GetCheckpointLock();
+	}
 	if (auto writer = GetTableDataWriter(table)) {
 		writer->WriteTableData(serializer);
 	}

@@ -15,6 +15,7 @@
 #include "duckdb/main/database_manager.hpp"
 #include "duckdb/transaction/meta_transaction.hpp"
 #include "duckdb/main/settings.hpp"
+#include "duckdb/parallel/lock_notifier.hpp"
 
 namespace duckdb {
 
@@ -62,9 +63,14 @@ Transaction &DuckTransactionManager::StartTransaction(ClientContext &context) {
 	auto &meta_transaction = MetaTransaction::Get(context);
 	unique_ptr<lock_guard<mutex>> start_lock;
 	if (!meta_transaction.IsReadOnly()) {
+		LockNotifier lock_notifier {context, "StartTransaction::CheckpointLock"};
 		start_lock = make_uniq<lock_guard<mutex>>(start_transaction_lock);
 	}
-	lock_guard<mutex> lock(transaction_lock);
+	unique_ptr<lock_guard<mutex>> lock;
+	{
+		LockNotifier lock_notifier {context, "StartTransaction::TransactionLock"};
+		lock = make_uniq<lock_guard<mutex>>(transaction_lock);
+	}
 	if (current_start_timestamp >= TRANSACTION_ID_START) { // LCOV_EXCL_START
 		throw InternalException("Cannot start more transactions, ran out of "
 		                        "transaction identifiers!");
@@ -191,6 +197,7 @@ void DuckTransactionManager::Checkpoint(ClientContext &context, bool force) {
 	if (!force) {
 		// not a force checkpoint
 		// try to get the checkpoint lock
+		// This is a non-blocking call, so no need to instrument
 		lock = checkpoint_lock.TryGetExclusiveLock();
 		if (!lock) {
 			// we could not manage to get the lock - cancel
@@ -199,6 +206,7 @@ void DuckTransactionManager::Checkpoint(ClientContext &context, bool force) {
 		}
 
 	} else {
+		LockNotifier lock_notifier {context, "ForceCheckpoint::CheckpointLock"};
 		// force checkpoint - wait to get an exclusive lock
 		// grab the start_transaction_lock to prevent new transactions from starting
 		lock_guard<mutex> start_lock(start_transaction_lock);
@@ -235,7 +243,11 @@ transaction_t DuckTransactionManager::GetCommitTimestamp() {
 
 ErrorData DuckTransactionManager::CommitTransaction(ClientContext &context, Transaction &transaction_p) {
 	auto &transaction = transaction_p.Cast<DuckTransaction>();
-	unique_lock<mutex> t_lock(transaction_lock);
+	unique_lock<mutex> t_lock;
+	{
+		LockNotifier lock_notifier {context, "CommitTransaction::TransactionLock"};
+		t_lock = unique_lock<mutex>(transaction_lock);
+	}
 	if (!db.IsSystem() && !db.IsTemporary()) {
 		if (transaction.ChangesMade()) {
 			if (transaction.IsReadOnly()) {
@@ -368,7 +380,12 @@ void DuckTransactionManager::RollbackTransaction(Transaction &transaction_p) {
 	ErrorData error;
 	{
 		// Obtain the transaction lock and roll back.
-		lock_guard<mutex> t_lock(transaction_lock);
+		unique_lock<mutex> t_lock;
+		{
+			auto strong_context = transaction.context.lock();
+			LockNotifier lock_notifier {strong_context.get(), "RollbackTransaction::TransactionLock"};
+			t_lock = unique_lock<mutex>(transaction_lock);
+		}
 		error = transaction.Rollback();
 
 		// Remove the transaction from the list of active transactions and gather cleanup information.

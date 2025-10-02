@@ -10,6 +10,7 @@
 #include "duckdb/transaction/duck_transaction_manager.hpp"
 #include "duckdb/function/function_list.hpp"
 #include "duckdb/common/encryption_state.hpp"
+#include "duckdb/parallel/lock_notifier.hpp"
 
 namespace duckdb {
 
@@ -142,13 +143,21 @@ optional_ptr<SchemaCatalogEntry> DuckCatalog::LookupSchema(CatalogTransaction tr
 
 DatabaseSize DuckCatalog::GetDatabaseSize(ClientContext &context) {
 	auto &transaction = DuckTransactionManager::Get(db);
-	auto lock = transaction.SharedCheckpointLock();
+	unique_ptr<StorageLockKey> lock;
+	{
+		LockNotifier lock_notifier {context, "GetDatabaseSize::CheckpointLock"};
+		lock = transaction.SharedCheckpointLock();
+	}
 	return db.GetStorageManager().GetDatabaseSize();
 }
 
 vector<MetadataBlockInfo> DuckCatalog::GetMetadataInfo(ClientContext &context) {
 	auto &transaction = DuckTransactionManager::Get(db);
-	auto lock = transaction.SharedCheckpointLock();
+	unique_ptr<StorageLockKey> lock;
+	{
+		LockNotifier lock_notifier {context, "GetMetadataInfo::CheckpointLock"};
+		lock = transaction.SharedCheckpointLock();
+	}
 	return db.GetStorageManager().GetMetadataInfo();
 }
 

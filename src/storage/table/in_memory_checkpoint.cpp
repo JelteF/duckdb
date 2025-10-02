@@ -2,6 +2,7 @@
 #include "duckdb/common/serializer/binary_serializer.hpp"
 #include "duckdb/catalog/catalog_entry/duck_table_entry.hpp"
 #include "duckdb/catalog/duck_catalog.hpp"
+#include "duckdb/parallel/lock_notifier.hpp"
 
 namespace duckdb {
 
@@ -54,7 +55,12 @@ void InMemoryCheckpointer::WriteTable(TableCatalogEntry &table, Serializer &seri
 	InMemoryTableDataWriter data_writer(*this, table);
 
 	// Write the table data
-	auto table_lock = table.GetStorage().GetCheckpointLock();
+	unique_ptr<StorageLockKey> table_lock;
+	{
+		LockNotifier lock_notifier {context, "InMemoryCheckpointer::TableLock"};
+		table_lock = table.GetStorage().GetCheckpointLock();
+	}
+
 	table.GetStorage().Checkpoint(data_writer, serializer);
 	// flush any partial blocks BEFORE releasing the table lock
 	// flushing partial blocks updates where data lives and is not thread-safe

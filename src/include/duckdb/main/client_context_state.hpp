@@ -94,6 +94,10 @@ public:
 	}
 	virtual void OnTaskStop(ClientContext &context, const std::string &task_type) {
 	}
+	virtual void OnLockAcquisitionStart(ClientContext &context, const std::string &lock_type) {
+	}
+	virtual void OnLockAcquisitionEnd(ClientContext &context, const std::string &lock_type) {
+	}
 
 public:
 	template <class TARGET>

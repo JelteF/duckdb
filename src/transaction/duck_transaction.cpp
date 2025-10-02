@@ -16,6 +16,7 @@
 #include "duckdb/storage/table/column_data.hpp"
 #include "duckdb/main/client_data.hpp"
 #include "duckdb/main/attached_database.hpp"
+#include "duckdb/parallel/lock_notifier.hpp"
 #include "duckdb/storage/storage_lock.hpp"
 #include "duckdb/storage/table/data_table_info.hpp"
 #include "duckdb/storage/table/scan_state.hpp"
@@ -283,6 +284,8 @@ void DuckTransaction::Cleanup(transaction_t lowest_active_transaction) {
 
 void DuckTransaction::SetReadWrite() {
 	Transaction::SetReadWrite();
+	auto strong_context = context.lock();
+	LockNotifier lock_notifier {strong_context.get(), "SetReadWrite::CheckpointLock"};
 	// obtain a shared checkpoint lock to prevent concurrent checkpoints while this transaction is running
 	write_lock = transaction_manager.SharedCheckpointLock();
 }
@@ -291,10 +294,13 @@ unique_ptr<StorageLockKey> DuckTransaction::TryGetCheckpointLock() {
 	if (!write_lock) {
 		throw InternalException("TryUpgradeCheckpointLock - but thread has no shared lock!?");
 	}
+	// This is a non-blocking call, so no need to instrument
 	return transaction_manager.TryUpgradeCheckpointLock(*write_lock);
 }
 
 shared_ptr<CheckpointLock> DuckTransaction::SharedLockTable(DataTableInfo &info) {
+	auto strong_context = context.lock();
+	LockNotifier lock_notifier {strong_context.get(), "SharedLockTable::TableLock"};
 	unique_lock<mutex> transaction_lock(active_locks_lock);
 	auto entry = active_locks.find(info);
 	if (entry == active_locks.end()) {
