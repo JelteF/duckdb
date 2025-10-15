@@ -643,6 +643,10 @@ bool StandardBufferManager::HasFilesInTemporaryDirectory() const {
 	return found;
 }
 
+BlockManager &StandardBufferManager::GetTemporaryBlockManager() {
+	return *temp_block_manager;
+}
+
 vector<TemporaryFileInformation> StandardBufferManager::GetTemporaryFiles() {
 	vector<TemporaryFileInformation> result;
 	if (temporary_directory.path.empty()) {
