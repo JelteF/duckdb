@@ -111,9 +111,20 @@ void SingleFileTableDataWriter::FinalizeTable(const TableStatistics &global_stat
 		pointer = existing_pointer;
 		total_rows = existing_rows.GetIndex();
 
+		static auto *enable_table_level_reuse_str_value = std::getenv("ENABLE_FASTER_TABLE_LEVEL_METADATA_REUSE");
+		static bool enable_table_level_reuse = enable_table_level_reuse_str_value != nullptr &&
+			(std::string(enable_table_level_reuse_str_value) == "true" || std::string(enable_table_level_reuse_str_value) == "1");
+
 		// label the blocks as used again to prevent them from being freed
 		auto &metadata_manager = checkpoint_manager.GetMetadataManager();
-		metadata_manager.ClearModifiedBlocks(existing_pointers);
+		if (enable_table_level_reuse) {
+			metadata_manager.ClearModifiedBlocks(existing_pointers);
+		} else {
+			// old code
+			MetadataReader reader(metadata_manager, pointer);
+			auto blocks = reader.GetRemainingBlocks();
+			metadata_manager.ClearModifiedBlocks(blocks);
+		}
 
 		// verify that existing_pointers indeed corresponds to the metadata blocks
 		if (debug_verify_blocks) {
