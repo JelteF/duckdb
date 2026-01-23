@@ -5,6 +5,7 @@
 #include "sqllogic_test_runner.hpp"
 #include "test_helpers.hpp"
 #include "gha_annotation.hpp"
+#include "catch.hpp"
 
 #include <sstream>
 
@@ -130,7 +131,8 @@ void SQLLogicTestLogger::PrintSQLFormatted() {
 }
 
 void SQLLogicTestLogger::PrintErrorHeader(const string &file_name, idx_t query_line, const string &description) {
-	gha::BeginAnnotation(file_name, static_cast<int>(query_line), description);
+	string title = description + ": " + Catch::getResultCapture().getCurrentTestName();
+	gha::BeginAnnotation(file_name, static_cast<int>(query_line), title);
 
 	std::ostringstream oss;
 	PrintSummaryHeader(file_name, query_line);
