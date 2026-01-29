@@ -23,9 +23,6 @@ std::string StripWorkspacePrefix(const std::string &path);
 //! Encodes a message for GitHub Actions workflow commands (newlines -> %0A, % -> %25)
 std::string EncodeMessage(const std::string &msg);
 
-//! Strips ANSI escape codes from a string (for cleaner annotation messages)
-std::string StripAnsiCodes(const std::string &str);
-
 //! Emits a GitHub Actions error annotation to stderr.
 //! Format: ::error file=path,line=N,title=Title::Message
 void EmitError(const std::string &file, int line, const std::string &title, const std::string &message);

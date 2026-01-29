@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <regex>
 #include <sstream>
 
 namespace duckdb {
@@ -28,12 +27,6 @@ std::string StripWorkspacePrefix(const std::string &path) {
 		return path.substr(prefix.length());
 	}
 	return path;
-}
-
-std::string StripAnsiCodes(const std::string &str) {
-	// ANSI escape sequences: ESC [ ... m (where ... is digits and semicolons)
-	static const std::regex ansi_regex("\x1b\\[[0-9;]*m");
-	return std::regex_replace(str, ansi_regex, "");
 }
 
 std::string EncodeMessage(const std::string &msg) {
@@ -108,7 +101,6 @@ void EndAnnotation() {
 	}
 	std::string full_summary = FailureSummary::GetFailureSummary();
 	std::string message = full_summary.substr(annotation_state.start_position);
-	message = StripAnsiCodes(message);
 	EmitError(annotation_state.file, annotation_state.line, annotation_state.title, message);
 	annotation_state.active = false;
 }
