@@ -11,6 +11,7 @@
 #include "duckdb/common/string.hpp"
 #include "duckdb/common/case_insensitive_map.hpp"
 #include "duckdb/common/identifier.hpp"
+#include "duckdb/common/helper.hpp"
 #include "duckdb/parser/keyword_helper.hpp"
 #include "duckdb/common/vector.hpp"
 
@@ -53,20 +54,20 @@ struct QualifiedName {
 
 	//! The catalog is the first element of the path, but only when the path is fully qualified ([catalog,
 	//! schema..., name])
-	const Identifier &Catalog() const {
+	const Identifier &Catalog() const DUCKDB_LIFETIMEBOUND {
 		return path.size() >= 3 ? path[0] : empty;
 	}
 	//! The schema is the element directly before the name (or empty if there is no schema)
-	const Identifier &Schema() const {
+	const Identifier &Schema() const DUCKDB_LIFETIMEBOUND {
 		return path.size() >= 2 ? path[path.size() - 2] : empty;
 	}
 	//! The name is the last element of the path
-	const Identifier &Name() const {
+	const Identifier &Name() const DUCKDB_LIFETIMEBOUND {
 		return path.empty() ? empty : path.back();
 	}
 	//! The full underlying path. Most callers should use Catalog()/Schema()/Name(); this is for multi-level schema
 	//! support (e.g. nested CREATE SCHEMA), where the qualification can be deeper than [catalog, schema].
-	const vector<Identifier> &Path() const {
+	const vector<Identifier> &Path() const DUCKDB_LIFETIMEBOUND {
 		return path;
 	}
 

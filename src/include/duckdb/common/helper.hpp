@@ -49,6 +49,16 @@ namespace duckdb {
 #define DUCKDB_EXPLICIT_FALLTHROUGH
 #endif
 
+//! Marks a member function whose returned reference points into `*this`, so that binding that reference to a
+//! longer-lived variable is diagnosed when the object it came from was a temporary - e.g.
+//! `const string &s = QualifiedName::Parse(x).Name().GetIdentifierName();`. GCC's -Wdangling-reference catches some of
+//! these shapes on its own; clang catches none of them without this annotation.
+#if __has_cpp_attribute(clang::lifetimebound)
+#define DUCKDB_LIFETIMEBOUND [[clang::lifetimebound]]
+#else
+#define DUCKDB_LIFETIMEBOUND
+#endif
+
 template <class... T>
 struct AlwaysFalse {
 	static constexpr bool VALUE = false;

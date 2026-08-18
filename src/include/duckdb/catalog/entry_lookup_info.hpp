@@ -10,6 +10,7 @@
 
 #include "duckdb/catalog/catalog_entry.hpp"
 #include "duckdb/common/error_data.hpp"
+#include "duckdb/common/helper.hpp"
 #include "duckdb/parser/query_error_context.hpp"
 #include "duckdb/parser/qualified_name.hpp"
 
@@ -37,16 +38,16 @@ public:
 public:
 	CatalogType GetCatalogType() const;
 	//! The (optionally qualified) name being looked up
-	const QualifiedName &GetQualifiedName() const;
+	const QualifiedName &GetQualifiedName() const DUCKDB_LIFETIMEBOUND;
 	//! The identifier being looked up (the catalog stores/compares names case-insensitively).
-	const Identifier &GetEntryIdentifier() const;
+	const Identifier &GetEntryIdentifier() const DUCKDB_LIFETIMEBOUND;
 	//! The raw name of the identifier being looked up.
-	const string &GetEntryName() const;
+	const string &GetEntryName() const DUCKDB_LIFETIMEBOUND;
 	//! The catalog qualification of the entry being looked up (empty if unqualified)
-	const Identifier &GetCatalog() const;
+	const Identifier &GetCatalog() const DUCKDB_LIFETIMEBOUND;
 	//! The schema qualification of the entry being looked up (empty if unqualified)
-	const Identifier &GetSchema() const;
-	const QueryErrorContext &GetErrorContext() const;
+	const Identifier &GetSchema() const DUCKDB_LIFETIMEBOUND;
+	const QueryErrorContext &GetErrorContext() const DUCKDB_LIFETIMEBOUND;
 	const optional_ptr<BoundAtClause> GetAtClause() const;
 
 	//! Build a schema lookup from a (possibly nested) schema path ([outermost..innermost]); the innermost component is

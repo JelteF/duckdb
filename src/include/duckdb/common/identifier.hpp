@@ -12,6 +12,7 @@
 #include "duckdb/common/unordered_map.hpp"
 #include "duckdb/common/unordered_set.hpp"
 #include "duckdb/common/string.hpp"
+#include "duckdb/common/helper.hpp"
 #include "duckdb/common/map.hpp"
 #include "duckdb/common/vector.hpp"
 
@@ -55,12 +56,12 @@ public:
 
 	//! Conversion back to a string is explicit: it discards the case-insensitive semantics, so callers must opt in
 	//! (use GetIdentifierName() for the raw value). Keeping this explicit is what makes the Identifier type safe.
-	explicit operator const string &() const {
+	explicit operator const string &() const DUCKDB_LIFETIMEBOUND {
 		return value;
 	}
 
 	//! The raw underlying string (preserving original casing)
-	const string &GetIdentifierName() const {
+	const string &GetIdentifierName() const DUCKDB_LIFETIMEBOUND {
 		return value;
 	}
 
