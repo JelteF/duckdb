@@ -192,8 +192,7 @@ shared_ptr<AttachedDatabase> DatabaseManager::AttachDatabase(ClientContext &cont
 		options.stored_database_path.reset();
 	}
 	if (AttachedDatabase::NameIsReserved(info.name)) {
-		throw BinderException("Attached database name \"%s\" cannot be used because it is a reserved name",
-		                      info.name.GetIdentifierName());
+		throw BinderException("Attached database name %s cannot be used because it is a reserved name", info.name);
 	}
 	if (!extension.empty()) {
 		if (!ExtensionHelper::TryAutoLoadExtension(context, extension)) {
@@ -265,16 +264,15 @@ optional_ptr<AttachedDatabase> DatabaseManager::FinalizeAttach(ClientContext &co
 
 void DatabaseManager::DetachDatabase(ClientContext &context, const Identifier &name, OnEntryNotFound if_not_found) {
 	if (GetDefaultDatabase(context) == name) {
-		throw BinderException("Cannot detach database \"%s\" because it is the default database. Select a different "
+		throw BinderException("Cannot detach database %s because it is the default database. Select a different "
 		                      "database using `USE` to allow detaching this database",
-		                      name.GetIdentifierName());
+		                      name);
 	}
 
 	auto attached_db = DetachInternal(name);
 	if (!attached_db) {
 		if (if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
-			throw BinderException("Failed to detach database with name \"%s\": database not found",
-			                      name.GetIdentifierName());
+			throw BinderException("Failed to detach database with name %s: database not found", name);
 		}
 		return;
 	}
@@ -302,8 +300,7 @@ void DatabaseManager::Alter(ClientContext &context, AlterInfo &info) {
 void DatabaseManager::RenameDatabase(ClientContext &context, const Identifier &old_name, const Identifier &new_name,
                                      OnEntryNotFound if_not_found) {
 	if (AttachedDatabase::NameIsReserved(new_name)) {
-		throw BinderException("Database name \"%s\" cannot be used because it is a reserved name",
-		                      new_name.GetIdentifierName());
+		throw BinderException("Database name %s cannot be used because it is a reserved name", new_name);
 	}
 
 	shared_ptr<AttachedDatabase> attached_db;
@@ -312,16 +309,15 @@ void DatabaseManager::RenameDatabase(ClientContext &context, const Identifier &o
 		auto old_entry = databases.find(old_name);
 		if (old_entry == databases.end()) {
 			if (if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
-				throw BinderException("Failed to rename database \"%s\": database not found",
-				                      old_name.GetIdentifierName());
+				throw BinderException("Failed to rename database %s: database not found", old_name);
 			}
 			return;
 		}
 
 		auto new_entry = databases.find(new_name);
 		if (new_entry != databases.end()) {
-			throw BinderException("Failed to rename database \"%s\" to \"%s\": database with new name already exists",
-			                      old_name.GetIdentifierName(), new_name.GetIdentifierName());
+			throw BinderException("Failed to rename database %s to %s: database with new name already exists", old_name,
+			                      new_name);
 		}
 
 		attached_db = old_entry->second;
@@ -345,6 +341,9 @@ shared_ptr<AttachedDatabase> DatabaseManager::DetachInternal(const Identifier &n
 		}
 		attached_db = std::move(entry->second);
 		databases.erase(entry);
+		if (name == default_database) {
+			default_database = databases.empty() ? Identifier() : databases.begin()->first;
+		}
 	}
 	if (attached_db && attached_db->GetCatalog().Supports(RemoteCapability::IS_REMOTE)) {
 		--remote_catalog_count;
@@ -397,18 +396,24 @@ void DatabaseManager::GetDatabaseType(ClientContext &context, AttachInfo &info, 
 		return;
 	}
 
-	auto extension_name = ExtensionHelper::ApplyExtensionAlias(options.db_type);
-	if (StorageExtension::Find(config, extension_name)) {
+	auto storage_extension_name = ExtensionHelper::ApplyExtensionAlias(options.db_type);
+	if (StorageExtension::Find(config, storage_extension_name)) {
 		// If the database type is already registered, we don't need to load it again.
 		return;
 	}
+	auto extension_name =
+	    ExtensionHelper::FindExtensionInEntries(Identifier(storage_extension_name), EXTENSION_STORAGE_EXTENSIONS);
+	if (extension_name.empty()) {
+		//! Couldn't find a mapping, assume that the storage extension name is also the extension name
+		extension_name = storage_extension_name;
+	}
 
 	// If we are loading a database type from an extension, then we need to check if that extension is loaded.
-	if (!Catalog::TryAutoLoad(context, options.db_type)) {
+	if (!Catalog::TryAutoLoad(context, extension_name)) {
 		// FIXME: Here it might be preferable to use an AutoLoadOrThrow kind of function
 		// so that either there will be success or a message to throw, and load will be
 		// attempted only once respecting the auto-loading options
-		ExtensionHelper::LoadExternalExtension(context, {options.db_type});
+		ExtensionHelper::LoadExternalExtension(context, {extension_name});
 	}
 }
 
@@ -426,18 +431,18 @@ Identifier DatabaseManager::GetDefaultDatabase(ClientContext &context) {
 }
 
 // LCOV_EXCL_START
-void DatabaseManager::SetDefaultDatabase(ClientContext &context, const string &new_value) {
-	auto db_entry = GetDatabase(context, Identifier(new_value));
+void DatabaseManager::SetDefaultDatabase(ClientContext &context, const Identifier &new_value) {
+	auto db_entry = GetDatabase(context, new_value);
 
 	if (!db_entry) {
-		throw InternalException("Database \"%s\" not found", new_value);
+		throw InternalException("Database %s not found", new_value);
 	} else if (db_entry->IsTemporary()) {
 		throw InternalException("Cannot set the default database to a temporary database");
 	} else if (db_entry->IsSystem()) {
 		throw InternalException("Cannot set the default database to a system database");
 	}
 
-	default_database = Identifier(new_value);
+	default_database = new_value;
 }
 // LCOV_EXCL_STOP
 

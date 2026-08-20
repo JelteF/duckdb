@@ -33,11 +33,11 @@ static void ListGenericFold(DataChunk &args, ExpressionState &state, Vector &res
 	D_ASSERT(rhs_child.GetVectorType() == VectorType::FLAT_VECTOR);
 
 	if (!FlatVector::ValidityMutable(lhs_child).CheckAllValid(lhs_count)) {
-		throw InvalidInputException("%s: left argument can not contain NULL values", func_name);
+		throw InvalidInputException("%s: left argument can not contain NULL values", SQLIdentifier(func_name));
 	}
 
 	if (!FlatVector::ValidityMutable(rhs_child).CheckAllValid(rhs_count)) {
-		throw InvalidInputException("%s: right argument can not contain NULL values", func_name);
+		throw InvalidInputException("%s: right argument can not contain NULL values", SQLIdentifier(func_name));
 	}
 
 	auto lhs_data = FlatVector::GetData<TYPE>(lhs_child);
@@ -47,8 +47,8 @@ static void ListGenericFold(DataChunk &args, ExpressionState &state, Vector &res
 	    lhs_vec, rhs_vec, result, [&](const list_entry_t &left, const list_entry_t &right) -> optional<TYPE> {
 		    if (left.length != right.length) {
 			    throw InvalidInputException(
-			        "%s: list dimensions must be equal, got left length '%d' and right length '%d'", func_name,
-			        left.length, right.length);
+			        "%s: list dimensions must be equal, got left length '%d' and right length '%d'",
+			        SQLIdentifier(func_name), left.length, right.length);
 		    }
 
 		    if (!OP::ALLOW_EMPTY && left.length == 0) {
@@ -91,6 +91,9 @@ ScalarFunctionSet ListInnerProductFun::GetFunctions() {
 	for (auto &type : LogicalType::Real()) {
 		AddListFoldFunction<InnerProductOp>(set, type);
 	}
+	for (auto &func : set.functions) {
+		func.SetFallible();
+	}
 	return set;
 }
 
@@ -98,6 +101,9 @@ ScalarFunctionSet ListNegativeInnerProductFun::GetFunctions() {
 	ScalarFunctionSet set("list_negative_inner_product");
 	for (auto &type : LogicalType::Real()) {
 		AddListFoldFunction<NegativeInnerProductOp>(set, type);
+	}
+	for (auto &func : set.functions) {
+		func.SetFallible();
 	}
 	return set;
 }
@@ -117,6 +123,9 @@ ScalarFunctionSet ListCosineDistanceFun::GetFunctions() {
 	ScalarFunctionSet set("list_cosine_distance");
 	for (auto &type : LogicalType::Real()) {
 		AddListFoldFunction<CosineDistanceOp>(set, type);
+	}
+	for (auto &func : set.functions) {
+		func.SetFallible();
 	}
 	return set;
 }

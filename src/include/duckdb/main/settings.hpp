@@ -457,6 +457,17 @@ struct ConfigureProfilingSetting {
 	static Value GetSetting(const ClientContext &context);
 };
 
+struct CurrentDialectSetting {
+	using RETURN_TYPE = string;
+	static constexpr const char *Name = "current_dialect";
+	static constexpr const char *Description = "The SQL dialect used by the parser";
+	static constexpr const char *InputType = "VARCHAR";
+	static constexpr const char *DefaultValue = "duckdb";
+	static constexpr SettingScopeTarget Scope = SettingScopeTarget::GLOBAL_ONLY;
+	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
+	static void OnSet(SettingCallbackInfo &info, Value &input);
+};
+
 struct CurrentTransactionInvalidationPolicySetting {
 	using RETURN_TYPE = string;
 	static constexpr const char *Name = "current_transaction_invalidation_policy";
@@ -835,17 +846,6 @@ struct DelimJoinAsCteSetting {
 	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
 };
 
-struct DeprecatedUsingKeySyntaxSetting {
-	using RETURN_TYPE = DeprecatedUsingKeySyntax;
-	static constexpr const char *Name = "deprecated_using_key_syntax";
-	static constexpr const char *Description = "Configures the use of the deprecated union syntax for USING KEY CTEs.";
-	static constexpr const char *InputType = "VARCHAR";
-	static constexpr const char *DefaultValue = "DEFAULT";
-	static constexpr SettingScopeTarget Scope = SettingScopeTarget::LOCAL_DEFAULT;
-	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
-	static void OnSet(SettingCallbackInfo &info, Value &input);
-};
-
 struct DialectCompatibilityModeSetting {
 	using RETURN_TYPE = DialectCompatibilityMode;
 	static constexpr const char *Name = "dialect_compatibility_mode";
@@ -1029,6 +1029,18 @@ struct EnableObjectCacheSetting {
 	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
 };
 
+struct EnableOptimisticWriteSetting {
+	using RETURN_TYPE = bool;
+	static constexpr const char *Name = "enable_optimistic_write";
+	static constexpr const char *Description =
+	    "Whether or not to optimistically write large appends to disk before committing. Disable this to keep bulk "
+	    "appends in memory (e.g. for in-memory benchmarks).";
+	static constexpr const char *InputType = "BOOLEAN";
+	static constexpr const char *DefaultValue = "true";
+	static constexpr SettingScopeTarget Scope = SettingScopeTarget::GLOBAL_DEFAULT;
+	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
+};
+
 struct EnableOptimizerSetting {
 	using RETURN_TYPE = bool;
 	static constexpr const char *Name = "enable_optimizer";
@@ -1168,6 +1180,18 @@ struct ExternalFileCacheRemoteBlockSizeSetting {
 	static constexpr SettingScopeTarget Scope = SettingScopeTarget::GLOBAL_DEFAULT;
 	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
 	static void OnSet(SettingCallbackInfo &info, Value &input);
+};
+
+struct ExternalFileCacheSpillSetting {
+	using RETURN_TYPE = bool;
+	static constexpr const char *Name = "external_file_cache_spill";
+	static constexpr const char *Description =
+	    "Whether evicted external file cache blocks of remote files spill to the temporary directory instead of being "
+	    "dropped, so that they are re-read from there rather than re-fetched from the source";
+	static constexpr const char *InputType = "BOOLEAN";
+	static constexpr const char *DefaultValue = "false";
+	static constexpr SettingScopeTarget Scope = SettingScopeTarget::GLOBAL_ONLY;
+	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
 };
 
 struct ExternalThreadsSetting {
@@ -1791,6 +1815,18 @@ struct ProgressBarTimeSetting {
 	static Value GetSetting(const ClientContext &context);
 };
 
+struct ReadAheadDepthSetting {
+	using RETURN_TYPE = int64_t;
+	static constexpr const char *Name = "read_ahead_depth";
+	static constexpr const char *Description = "Number of scan jobs the multi-file reader prefetches ahead of "
+	                                           "decoding. -1 = automatic (based on thread count), 0 = disabled.";
+	static constexpr const char *InputType = "BIGINT";
+	static constexpr const char *DefaultValue = "-1";
+	static constexpr SettingScopeTarget Scope = SettingScopeTarget::GLOBAL_DEFAULT;
+	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
+	static void OnSet(SettingCallbackInfo &info, Value &input);
+};
+
 struct RegexMatchOperatorSemanticsSetting {
 	using RETURN_TYPE = RegexMatchOperatorSemantics;
 	static constexpr const char *Name = "regex_match_operator_semantics";
@@ -1859,6 +1895,19 @@ struct SecretDirectorySetting {
 	static void SetGlobal(DatabaseInstance *db, DBConfig &config, const Value &parameter);
 	static void ResetGlobal(DatabaseInstance *db, DBConfig &config);
 	static Value GetSetting(const ClientContext &context);
+};
+
+struct ShowBehaviorSetting {
+	using RETURN_TYPE = ShowBehaviorType;
+	static constexpr const char *Name = "show_behavior";
+	static constexpr const char *Description =
+	    "How SHOW resolves a bare identifier: 'auto' (describe a table if one exists, else a setting; deprecated), "
+	    "'table' (always a table), or 'setting' (always a setting)";
+	static constexpr const char *InputType = "VARCHAR";
+	static constexpr const char *DefaultValue = "AUTO";
+	static constexpr SettingScopeTarget Scope = SettingScopeTarget::GLOBAL_DEFAULT;
+	static constexpr idx_t SettingIndex = NEXT_SETTING_INDEX();
+	static void OnSet(SettingCallbackInfo &info, Value &input);
 };
 
 struct StandardVectorSizeSetting {
