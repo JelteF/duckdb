@@ -64,7 +64,7 @@ void SetCopyOptions(unique_ptr<CopyInfo> &info, vector<GenericCopyOption> &optio
 		if (format_option->second.empty()) {
 			throw ParserException("Unsupported parameter type for FORMAT: expected e.g. FORMAT 'csv', 'parquet'");
 		}
-		info->format = format_option->second[0].GetValue<string>();
+		info->format = format_option->second[0].GetValue<Identifier>();
 		info->is_format_auto_detected = false;
 		info->options.erase(format_option);
 	}
@@ -113,7 +113,7 @@ CopyDatabaseType PEGTransformerFactory::TransformCopyDatabaseFlag(PEGTransformer
 	return schema_or_data;
 }
 
-string PEGTransformerFactory::ExtractFormat(const string &file_path) {
+Identifier PEGTransformerFactory::ExtractFormat(const string &file_path) {
 	auto format = StringUtil::Lower(file_path);
 	if (StringUtil::EndsWith(format, CompressionExtensionFromType(FileCompressionType::GZIP))) {
 		format = format.substr(0, format.size() - 3);
@@ -123,9 +123,9 @@ string PEGTransformerFactory::ExtractFormat(const string &file_path) {
 	size_t dot_pos = format.rfind('.');
 	if (dot_pos == std::string::npos || dot_pos == format.length() - 1) {
 		// No format found
-		return "";
+		return Identifier();
 	}
-	return format.substr(dot_pos + 1);
+	return Identifier(format.substr(dot_pos + 1));
 }
 
 unique_ptr<SQLStatement>

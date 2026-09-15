@@ -68,7 +68,7 @@ string CopyInfo::CopyOptionsToString() const {
 	result += " (";
 	vector<string> stringified;
 	if (!format.empty() && !is_format_auto_detected) {
-		stringified.push_back(StringUtil::Format(" FORMAT %s", SQLString(format)));
+		stringified.push_back(StringUtil::Format(" FORMAT %s", SQLString(format.GetIdentifierName())));
 	}
 	for (auto &opt : parsed_options) {
 		auto &name = opt.first;
