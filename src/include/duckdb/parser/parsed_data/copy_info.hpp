@@ -33,7 +33,7 @@ public:
 	//! Whether or not this is a copy to file (false) or copy from a file (true)
 	bool is_from;
 	//! The file format of the external file
-	string format;
+	Identifier format;
 	//! If the format is manually set (i.e., via the format parameter) or was discovered by inspecting the file path
 	bool is_format_auto_detected;
 	//! Expression to determine the file path (if any)

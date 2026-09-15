@@ -167,7 +167,7 @@ static BoundStatement CopyToJSONPlanInternal(Binder &binder, CopyStatement &stmt
 	bool write_partition_columns = false;
 	vector<Identifier> original_column_names;
 	const auto is_geojson = format == JSONCopyToFormat::GEOJSON;
-	const auto is_geojsonl = is_geojson && StringUtil::CIEquals(stmt.info->format, "geojsonl");
+	const auto is_geojsonl = is_geojson && stmt.info->format == "geojsonl";
 	// GeoJSON is wrapped in a FeatureCollection by default, but newline-delimited GeoJSON (geojsonl) and plain
 	// JSON are not wrapped unless ARRAY is requested
 	bool array_output = is_geojson && !is_geojsonl;

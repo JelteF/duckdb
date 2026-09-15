@@ -43,7 +43,7 @@ static bool GetBooleanArg(ClientContext &context, const vector<Value> &arg) {
 	return arg.empty() || arg[0].CastAs(context, LogicalType::BOOLEAN).GetValue<bool>();
 }
 
-void IsFormatExtensionKnown(const string &format) {
+void IsFormatExtensionKnown(const Identifier &format) {
 	for (auto &file_postfixes : EXTENSION_FILE_POSTFIXES) {
 		if (format == file_postfixes.name + 1) {
 			// It's a match, we must throw
@@ -269,7 +269,7 @@ static CopyToResolvedOptions ResolveCopyToOptions(ClientContext &context, const 
 }
 
 static void ValidateCopyToOptionCombinations(const CopyToParsedOptions &options, const CopyFunction &function,
-                                             const string &format) {
+                                             const Identifier &format) {
 	if (options.OverwriteMode() == CopyOverwriteMode::COPY_APPEND && !options.GetFilenamePattern().HasUUID()) {
 		throw BinderException("APPEND mode requires a {uuid} label in filename_pattern");
 	}
@@ -655,7 +655,7 @@ vector<Value> BindCopyOption(ClientContext &context, TableFunctionBinder &option
 	return result;
 }
 
-string ExtractFormat(const string &file_path) {
+Identifier ExtractFormat(const string &file_path) {
 	auto format = StringUtil::Lower(file_path);
 	// We first remove extension suffixes
 	if (StringUtil::EndsWith(format, CompressionExtensionFromType(FileCompressionType::GZIP))) {
@@ -667,10 +667,10 @@ string ExtractFormat(const string &file_path) {
 	size_t dot_pos = format.rfind('.');
 	if (dot_pos == std::string::npos || dot_pos == format.length() - 1) {
 		// No format found
-		return "";
+		return Identifier();
 	}
 	// We found something
-	return format.substr(dot_pos + 1);
+	return Identifier(format.substr(dot_pos + 1));
 }
 
 void Binder::BindCopyOptions(CopyInfo &info) {
@@ -694,7 +694,7 @@ void Binder::BindCopyOptions(CopyInfo &info) {
 			if (inputs.size() != 1 || inputs[0].type().id() != LogicalTypeId::VARCHAR) {
 				throw ParserException("Unsupported parameter type for FORMAT: expected e.g. FORMAT 'csv', 'parquet'");
 			}
-			info.format = StringUtil::Lower(inputs[0].ToString());
+			info.format = inputs[0].GetValue<Identifier>();
 			info.is_format_auto_detected = false;
 			continue;
 		}
@@ -737,7 +737,7 @@ BoundStatement Binder::Bind(CopyStatement &stmt, CopyToType copy_to_type) {
 	auto entry = catalog.GetEntry(
 	    entry_retriever,
 	    EntryLookupInfo(CatalogType::COPY_FUNCTION_ENTRY,
-	                    QualifiedName(catalog.GetName(), Identifier::DefaultSchema(), Identifier(stmt.info->format))),
+	                    QualifiedName(catalog.GetName(), Identifier::DefaultSchema(), stmt.info->format)),
 	    on_entry_do);
 
 	if (!entry) {

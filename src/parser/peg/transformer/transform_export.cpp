@@ -24,7 +24,7 @@ PEGTransformerFactory::TransformExportStatement(PEGTransformer &transformer, con
 				if (option.children.empty()) {
 					throw ParserException("FORMAT requires a parameter, e.g. FORMAT 'csv' or FORMAT 'parquet'");
 				}
-				info->format = option.children[0].GetValue<string>();
+				info->format = option.children[0].GetValue<Identifier>();
 				info->is_format_auto_detected = false;
 			} else if (option.expression) {
 				info->parsed_options[option.name] = option.expression->Copy();

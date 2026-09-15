@@ -4060,7 +4060,7 @@ public:
 	static string TransformStringLiteral(PEGTransformer &transformer, ParseResult &parse_result);
 	static DatePartSpecifier TransformIntervalToIntervalAsType(PEGTransformer &transformer, ParseResult &parse_result);
 
-	static string ExtractFormat(const string &file_path);
+	static Identifier ExtractFormat(const string &file_path);
 
 	// create_table.gram
 	static string TransformIdentifier(PEGTransformer &transformer, ParseResult &parse_result);

@@ -544,7 +544,7 @@
       {
         "id": 205,
         "name": "format",
-        "type": "string"
+        "type": "Identifier"
       },
       {
         "id": 206,
