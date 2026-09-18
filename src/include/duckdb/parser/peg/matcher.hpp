@@ -164,6 +164,13 @@ struct MatchContext {
 	IdentifierCaseMode identifier_case_mode;
 	ParserPackratCache *packrat_cache;
 	MatchMode mode;
+
+	//! An optional that matched nothing carries no information at all: no rule, no name and no source location. One
+	//! instance per match run therefore stands in for all of them.
+	optional_ptr<ParseResult> EmptyOptionalResult();
+
+private:
+	optional_ptr<ParseResult> empty_optional;
 };
 
 struct MatchState {
@@ -445,8 +452,8 @@ public:
 			return ParseResultChildren();
 		}
 		arena.AlignNext();
-		auto target = reinterpret_cast<reference<ParseResult> *>(
-		    arena.Allocate(count * sizeof(reference<ParseResult>)));
+		auto target =
+		    reinterpret_cast<reference<ParseResult> *>(arena.Allocate(count * sizeof(reference<ParseResult>)));
 		memcpy(static_cast<void *>(target), static_cast<const void *>(children),
 		       count * sizeof(reference<ParseResult>));
 		return ParseResultChildren(target, count);
