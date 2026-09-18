@@ -443,6 +443,11 @@ public:
 	}
 
 	const CompiledGrammarRule &GetRule(const string &rule_name) const;
+	//! Overload taken by the generated transformers, which pass string literals. Looking a rule up by name means
+	//! building a std::string and hashing it case-insensitively for every node visited, so results are cached per
+	//! literal address. The address is only a cache key: a miss falls back to the name lookup, so two literals with
+	//! the same text at different addresses are merely cached twice.
+	const CompiledGrammarRule &GetRule(const char *rule_name);
 
 public:
 	template <typename T>
@@ -579,6 +584,10 @@ public:
 
 	ParserOptions options;
 	const CompiledGrammar &grammar;
+
+private:
+	//! See GetRule(const char *)
+	unordered_map<const char *, reference<const CompiledGrammarRule>> rule_cache;
 
 private:
 	friend class GeneratedTransformProcess;
