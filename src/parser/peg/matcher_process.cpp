@@ -7,6 +7,59 @@
 
 namespace duckdb {
 
+//! Collects the children of a list or repeat while it is matching. The buffer lives in the process arena, which is
+//! released as a whole when the match run ends, so a list that fails half-way costs nothing to unwind. Only the
+//! children of a successful match are copied into the longer-lived parse result arena.
+class ChildCollector {
+public:
+	ChildCollector(MatchState &state, idx_t initial_capacity) : arena(state.context.process_allocator) {
+		Reserve(initial_capacity);
+	}
+
+	void Add(ParseResult &result) {
+		if (count == capacity) {
+			Reserve(capacity == 0 ? 4 : capacity * 2);
+		}
+		new (children + count) reference<ParseResult>(result);
+		count++;
+	}
+
+	idx_t Size() const {
+		return count;
+	}
+
+	//! The children collected so far, valid until the next Add
+	ParseResultChildren Children() const {
+		return ParseResultChildren(children, count);
+	}
+
+	ParseResultChildren Finalize(MatchState &state) const {
+		return state.context.allocator.MakeChildren(children, count);
+	}
+
+private:
+	void Reserve(idx_t new_capacity) {
+		if (new_capacity <= capacity) {
+			return;
+		}
+		arena.AlignNext();
+		auto target =
+		    reinterpret_cast<reference<ParseResult> *>(arena.Allocate(new_capacity * sizeof(reference<ParseResult>)));
+		if (count > 0) {
+			memcpy(static_cast<void *>(target), static_cast<const void *>(children),
+			       count * sizeof(reference<ParseResult>));
+		}
+		children = target;
+		capacity = new_capacity;
+	}
+
+private:
+	ArenaAllocator &arena;
+	reference<ParseResult> *children = nullptr;
+	idx_t count = 0;
+	idx_t capacity = 0;
+};
+
 MatchStep MatchStep::Child(MatchInput input) {
 	return MatchStep(input, nullopt);
 }
@@ -50,7 +103,7 @@ arena_ptr<MatchProcess> AtomicMatcher::StartMatch(MatchState &state) const {
 class ListMatchProcess : public MatchProcess {
 public:
 	ListMatchProcess(const ListMatcher &matcher_p, MatchState &state_p)
-	    : matcher(matcher_p), state(state_p), list_state(state_p) {
+	    : matcher(matcher_p), state(state_p), list_state(state_p), results(state_p, matcher_p.matchers.size()) {
 		saved_suggestion_size = matcher.suppress_suggestions ? list_state.context.suggestions.size() : 0;
 		if (auto current = list_state.token_iterator.Current()) {
 			start_offset = optional_idx(current->offset);
@@ -66,22 +119,23 @@ public:
 				return MatchStep::Complete(MatcherResult::Failure());
 			}
 			if (child_result->HasParseResult()) {
-				results.push_back(*child_result->GetParseResult());
+				results.Add(*child_result->GetParseResult());
 			}
 			child_index++;
 		}
 		while (child_index < matcher.matchers.size()) {
+			auto &child_matcher = matcher.matchers[child_index].get();
 			auto current = list_state.token_iterator.Current();
 			bool at_autocomplete_cursor = current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
 			if (!at_autocomplete_cursor) {
 				awaiting_child = true;
-				return MatchStep::Child({matcher.matchers[child_index].get(), list_state});
+				return MatchStep::Child({child_matcher, list_state});
 			}
 			if (matcher.suppress_suggestions) {
 				DiscardSuggestions();
 				return MatchStep::Complete(MatcherResult::Failure());
 			}
-			if (matcher.matchers[child_index].get().AddSuggestion(list_state) == SuggestionType::OPTIONAL) {
+			if (child_matcher.AddSuggestion(list_state) == SuggestionType::OPTIONAL) {
 				child_index++;
 				continue;
 			}
@@ -97,9 +151,9 @@ public:
 				return MatchStep::Complete(MatcherResult::Success(passthrough));
 			}
 		}
-		auto list_name = matcher.HasName() ? matcher.GetName() : string();
+		auto list_name = matcher.HasName() ? &matcher.GetNameRef() : nullptr;
 		return MatchStep::Complete(
-		    state.AllocateParseResult<ListParseResult>(std::move(results), std::move(list_name), start_offset));
+		    state.AllocateParseResult<ListParseResult>(results.Finalize(state), list_name, start_offset));
 	}
 
 private:
@@ -107,7 +161,7 @@ private:
 	//! that matched nothing. Returns nullptr when the list cannot be collapsed.
 	optional_ptr<ParseResult> FindPassthroughResult() const {
 		optional_ptr<ParseResult> passthrough;
-		for (auto &child : results) {
+		for (auto &child : results.Children()) {
 			auto &child_result = child.get();
 			if (child_result.type == ParseResultType::OPTIONAL &&
 			    !child_result.Cast<OptionalParseResult>().HasResult()) {
@@ -134,7 +188,7 @@ private:
 	const ListMatcher &matcher;
 	MatchState &state;
 	MatchState list_state;
-	vector<reference<ParseResult>> results;
+	ChildCollector results;
 	idx_t child_index = 0;
 	idx_t saved_suggestion_size = 0;
 	optional_idx start_offset;
@@ -252,7 +306,7 @@ arena_ptr<MatchProcess> OptionalMatcher::StartMatch(MatchState &state) const {
 class RepeatMatchProcess : public MatchProcess {
 public:
 	RepeatMatchProcess(const RepeatMatcher &matcher_p, MatchState &state_p)
-	    : matcher(matcher_p), state(state_p), repeat_state(state_p) {
+	    : matcher(matcher_p), state(state_p), repeat_state(state_p), results(state_p, 0) {
 		if (auto current = repeat_state.token_iterator.Current()) {
 			start_offset = optional_idx(current->offset);
 		}
@@ -270,7 +324,7 @@ public:
 			}
 			matched_once = true;
 			if (child_result->HasParseResult()) {
-				results.push_back(*child_result->GetParseResult());
+				results.Add(*child_result->GetParseResult());
 			}
 			state.token_iterator.SetPosition(repeat_state.token_iterator);
 			auto current = repeat_state.token_iterator.Current();
@@ -291,14 +345,14 @@ public:
 
 private:
 	MatcherResult CreateResult() {
-		return state.AllocateParseResult<RepeatParseResult>(std::move(results), start_offset);
+		return state.AllocateParseResult<RepeatParseResult>(results.Finalize(state), start_offset);
 	}
 
 private:
 	const RepeatMatcher &matcher;
 	MatchState &state;
 	MatchState repeat_state;
-	vector<reference<ParseResult>> results;
+	ChildCollector results;
 	bool matched_once = false;
 	optional_idx start_offset;
 	bool awaiting_child = false;
