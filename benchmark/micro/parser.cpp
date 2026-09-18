@@ -20,7 +20,10 @@ enum class ParserWorkload : uint8_t {
 	TPCH,
 	TPCDS,
 	FLUMMI,
-	AOC
+	AOC,
+	SHAPES,
+	VALUES_LIST,
+	SCRIPT
 };
 
 struct ParserBenchmarkState : public BenchmarkState {
@@ -160,6 +163,9 @@ public:
 		case ParserWorkload::TPCDS:
 		case ParserWorkload::FLUMMI:
 		case ParserWorkload::AOC:
+		case ParserWorkload::SHAPES:
+		case ParserWorkload::VALUES_LIST:
+		case ParserWorkload::SCRIPT:
 			return StringUtil::Join(LoadQueries(), "\n");
 		default:
 			throw InternalException("Unknown parser benchmark workload");
@@ -213,6 +219,12 @@ private:
 		switch (workload) {
 		case ParserWorkload::FLUMMI:
 			return {ReadQuery("benchmark/recursive_cte/queries/performance/flummi_ray.sql")};
+		case ParserWorkload::SHAPES:
+			return {ReadQuery("benchmark/micro/parser/parser_shapes.sql")};
+		case ParserWorkload::VALUES_LIST:
+			return {ReadQuery("benchmark/micro/parser/parser_values_list.sql")};
+		case ParserWorkload::SCRIPT:
+			return {ReadQuery("benchmark/micro/parser/parser_script.sql")};
 		case ParserWorkload::TPCH:
 			prefix = "extension/tpch/dbgen/queries/q";
 			break;
@@ -247,6 +259,9 @@ ParserMicroBenchmark parser_tpch("ParserTPCH", ParserWorkload::TPCH, 50);
 ParserMicroBenchmark parser_tpcds("ParserTPCDS", ParserWorkload::TPCDS, 10);
 ParserMicroBenchmark parser_flummi("ParserFlummi", ParserWorkload::FLUMMI, 5);
 ParserMicroBenchmark parser_aoc("ParserAoC", ParserWorkload::AOC, 10);
+ParserMicroBenchmark parser_shapes("ParserShapes", ParserWorkload::SHAPES, 50);
+ParserMicroBenchmark parser_values_list("ParserValuesList", ParserWorkload::VALUES_LIST, 200);
+ParserMicroBenchmark parser_script("ParserScript", ParserWorkload::SCRIPT, 100, 60);
 
 struct ParserGrammarConstructionState : public BenchmarkState {
 	idx_t grammars_constructed = 0;

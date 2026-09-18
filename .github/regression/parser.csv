@@ -8,3 +8,6 @@ ParserTPCDS
 ParserFlummi
 ParserAoC
 ParserGrammarConstruction
+ParserShapes
+ParserValuesList
+ParserScript

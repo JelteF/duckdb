@@ -47,6 +47,9 @@ Grammar extensions are not included in any of these benchmarks.
 | `ParserTPCDS` | All 99 TPC-DS query files, repeated 10 times | 990 | 1 |
 | `ParserFlummi` | The approximately 373 KiB generated Flummi ray-tracing query, repeated 5 times | 5 | 1 |
 | `ParserAoC` | All 25 Advent of Code 2024 query files, repeated 10 times | 250 | 1 |
+| `ParserShapes` | One statement covering every expression shape the grammar treats differently | 50 | 1 |
+| `ParserValuesList` | One large `VALUES` list | 200 | 1 |
+| `ParserScript` | A 60-statement script parsed in one call | 100 | 60 |
 | `ParserGrammarConstruction` | Construct and destroy the base grammar | 500 constructions | No SQL parsing |
 
 The small synthetic cases help isolate regressions. TPC-H and TPC-DS cover realistic
@@ -59,6 +62,9 @@ SQL sources, loaded in numeric query order:
 
 - TPC-H: `extension/tpch/dbgen/queries/q01.sql` through `q22.sql`.
 - TPC-DS: `extension/tpcds/dsdgen/queries/01.sql` through `99.sql`.
+- Shapes: `benchmark/micro/parser/parser_shapes.sql`.
+- Values list: `benchmark/micro/parser/parser_values_list.sql`.
+- Script: `benchmark/micro/parser/parser_script.sql`.
 - Flummi: `benchmark/recursive_cte/queries/performance/flummi_ray.sql`.
 - AoC: `benchmark/aoc24/queries/day01.sql` through `day25.sql`; provenance and license
   are documented in `benchmark/aoc24/README.md` and `benchmark/aoc24/LICENSE`.
@@ -77,6 +83,43 @@ Keep the SQL files, input sizes and iteration counts unchanged when comparing re
 workload changes materially, give it a new benchmark name to preserve its history.
 The count checks detect parse failures and missing statements; they are not a
 replacement for parser correctness tests.
+
+## Running them
+
+Build the benchmark runner and run the three by name:
+
+```sh
+make benchmark
+build/release/benchmark/benchmark_runner 'ParserShapes'
+build/release/benchmark/benchmark_runner 'ParserValuesList'
+build/release/benchmark/benchmark_runner 'ParserScript'
+```
+
+The argument is a regular expression over benchmark names, so `'Parser.*'` runs the
+whole group and `'ParserS.*'` runs the shapes and script cases. The runner must be
+started from the checkout root, because the inputs are read by relative path.
+
+## What the three parser inputs cover
+
+The three inputs are deliberately different shapes, because a parser change can be
+invisible in one and decisive in another.
+
+`ParserShapes` is a single statement that exercises every expression form this grammar
+treats differently: a wide `VALUES` list, a long additive chain, a boolean chain, `IN`
+lists, a `CASE` with many branches, chained indirections and deep parenthesis nesting.
+It is the broad case, and the one most changes show up in.
+
+`ParserValuesList` is a single large `VALUES` list and almost nothing else. It is
+narrow on purpose: it concentrates on the tokenizer and on the repeated, shallow
+expression matching a long literal list produces, so a change to per-token or
+per-element cost shows up here far more clearly than in a mixed statement.
+
+`ParserScript` is 60 statements handed to a single `ParseQuery` call, which is what a
+client sending a whole file does, rather than the one-statement-per-call shape of every
+other case here. Per-statement setup is amortized over one statement in the other
+benchmarks and over sixty here, so work done once per statement - allocating or
+clearing a memoization row, for instance - is only visible in this one. Its statements
+rotate through ten shapes so that no single grammar rule dominates the measurement.
 
 ## What the targeted cases measure
 
