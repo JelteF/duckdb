@@ -24,6 +24,7 @@ class DialectExtension;
 class Matcher;
 class TransformProcess;
 class GrammarChange;
+struct TransformFrameOps;
 
 using grammar_transform_process_function_t =
     std::function<arena_ptr<TransformProcess>(PEGTransformer &, ParseResult &)>;
@@ -38,6 +39,10 @@ struct ParsedGrammarRule {
 
 	string name;
 	PEGRule recipe;
+	//! Set for the rules whose transformer is generated, which start without going through transform_process
+	optional_ptr<const TransformFrameOps> generated_ops;
+	//! Set when the rule's transformer never asks for a child, so it can be run without a frame of its own
+	bool childless_transform = false;
 	grammar_transform_process_function_t transform_process;
 };
 
@@ -65,6 +70,10 @@ public:
 	                              const grammar_cursor_function_t &find_cursor);
 	DUCKDB_API void ReplaceRule(const string &rule_definition,
 	                            grammar_transform_process_function_t transform_process = nullptr);
+	//! Start this rule's transformer from the generated frame operations, without a std::function in between
+	DUCKDB_API void SetGeneratedTransformOps(const string &rule_name, const TransformFrameOps &ops);
+	//! Mark a rule whose transformer never asks for a child
+	DUCKDB_API void SetChildlessTransform(const string &rule_name);
 	DUCKDB_API void SetTransformProcess(const string &rule_name,
 	                                    grammar_transform_process_function_t transform_process);
 	DUCKDB_API void AddTerminalRuleOverride(const string &rule_name, terminal_rule_matcher_factory_t matcher_factory);
@@ -94,14 +103,27 @@ private:
 
 //! Immutable semantic data referenced directly by matchers and parse results.
 struct CompiledGrammarRule {
-	CompiledGrammarRule(string name_p, grammar_transform_process_function_t transform_process_p)
-	    : name(std::move(name_p)), transform_process(std::move(transform_process_p)) {
+	CompiledGrammarRule(string name_p, grammar_transform_process_function_t transform_process_p,
+	                    optional_ptr<const TransformFrameOps> generated_ops_p, bool childless_transform_p)
+	    : name(std::move(name_p)), transform_process(std::move(transform_process_p)), generated_ops(generated_ops_p),
+	      childless_transform(childless_transform_p) {
 	}
 
 	arena_ptr<TransformProcess> StartTransform(PEGTransformer &transformer, ParseResult &parse_result) const;
+	//! Whether this rule can be transformed at all, by either route
+	bool HasTransform() const {
+		return generated_ops || transform_process;
+	}
+	//! Whether the rule's transformer runs to completion in one step, so TransformStack can run it without a frame
+	bool IsChildlessTransform() const {
+		return childless_transform && generated_ops;
+	}
 
 	string name;
 	grammar_transform_process_function_t transform_process;
+	//! The generated transformer of this rule, started directly rather than through transform_process
+	optional_ptr<const TransformFrameOps> generated_ops;
+	bool childless_transform;
 };
 
 } // namespace duckdb

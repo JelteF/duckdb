@@ -428,6 +428,7 @@ private:
 	void PushFrame(TransformInput input);
 	void InitializeFrame(TransformStackFrame &frame);
 	transform_result_ptr ExecuteFrame(TransformStackFrame &frame);
+	transform_result_ptr TryTransformWithoutFrame(TransformInput input);
 
 private:
 	PEGTransformer &transformer;

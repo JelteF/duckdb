@@ -4090,7 +4090,7 @@ void PEGTransformerFactory::InitializeAlterOptionsTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -4170,7 +4170,7 @@ void PEGTransformerFactory::InitializeAlterTableOptionsTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -4552,7 +4552,7 @@ void PEGTransformerFactory::InitializeAlterColumnEntryTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -4572,7 +4572,7 @@ void PEGTransformerFactory::InitializeAddOrDropDefaultTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -4631,7 +4631,7 @@ void PEGTransformerFactory::InitializeDropOrSetTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -4821,7 +4821,7 @@ void PEGTransformerFactory::InitializeAlterSequenceOptionsTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5133,7 +5133,7 @@ void PEGTransformerFactory::InitializeCommentOnTypeTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5274,7 +5274,7 @@ void PEGTransformerFactory::InitializeCommentValueTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5343,7 +5343,7 @@ void PEGTransformerFactory::InitializeExpressionAliasTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5476,7 +5476,7 @@ void PEGTransformerFactory::InitializeTypeVariationsTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5496,7 +5496,7 @@ void PEGTransformerFactory::InitializeSimpleTypeTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5558,7 +5558,7 @@ void PEGTransformerFactory::InitializeIntervalTypeTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5578,7 +5578,7 @@ void PEGTransformerFactory::InitializeIntervalIntervalTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5598,7 +5598,7 @@ void PEGTransformerFactory::InitializeIntervalWithSpecifierTrampoline(PEGTransfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5661,7 +5661,7 @@ void PEGTransformerFactory::InitializeIntervalToIntervalAsTypeTrampoline(PEGTran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		return;
 	}
@@ -5832,7 +5832,7 @@ void PEGTransformerFactory::InitializeIntervalTrampoline(PEGTransformer &transfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -5852,7 +5852,7 @@ void PEGTransformerFactory::InitializeIntervalToIntervalTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6058,7 +6058,7 @@ void PEGTransformerFactory::InitializeNumericTypeTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6078,7 +6078,7 @@ void PEGTransformerFactory::InitializeSimpleNumericTypeTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process &&
 	    (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	     choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR ||
@@ -6122,7 +6122,7 @@ void PEGTransformerFactory::InitializeDecimalNumericTypeTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6296,7 +6296,7 @@ void PEGTransformerFactory::InitializeQualifiedTypeNameTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6574,7 +6574,7 @@ void PEGTransformerFactory::InitializeArrayBoundsTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6670,7 +6670,7 @@ void PEGTransformerFactory::InitializeTimeOrTimestampTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6726,7 +6726,7 @@ void PEGTransformerFactory::InitializeWithOrWithoutTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6799,7 +6799,7 @@ void PEGTransformerFactory::InitializeSessionTargetTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6879,7 +6879,7 @@ void PEGTransformerFactory::InitializeCopyVariationsTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -6934,7 +6934,7 @@ void PEGTransformerFactory::InitializeFromOrToTrampoline(PEGTransformer &transfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7002,7 +7002,7 @@ void PEGTransformerFactory::InitializeCopyFileNameTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7022,7 +7022,7 @@ void PEGTransformerFactory::InitializeCopyFileNameExpressionTrampoline(PEGTransf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7145,7 +7145,7 @@ void PEGTransformerFactory::InitializeCopyOptionListTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7229,7 +7229,7 @@ void PEGTransformerFactory::InitializeSpecializedOptionTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7249,7 +7249,7 @@ void PEGTransformerFactory::InitializeSingleOptionTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7423,7 +7423,7 @@ void PEGTransformerFactory::InitializeStarSymbolColumnListTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process && (choice_result.Name() == "StarSymbol")) {
 		return;
 	}
@@ -7474,7 +7474,7 @@ void PEGTransformerFactory::InitializePartitionByColumnListTrampoline(PEGTransfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7596,7 +7596,7 @@ void PEGTransformerFactory::InitializeCopyGenericOptionTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7708,7 +7708,7 @@ void PEGTransformerFactory::InitializeGenericCopyOptionValueTrampoline(PEGTransf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7775,7 +7775,7 @@ void PEGTransformerFactory::InitializeCopyFromDatabaseTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -7845,7 +7845,7 @@ void PEGTransformerFactory::InitializeSchemaOrDataTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8011,7 +8011,7 @@ void PEGTransformerFactory::InitializeRelOptionOrOidsTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8069,7 +8069,7 @@ void PEGTransformerFactory::InitializeWithOrWithoutOidsTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8187,7 +8187,7 @@ void PEGTransformerFactory::InitializeRelOptionNameTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.Name().empty() || choice_result.type == ParseResultType::IDENTIFIER ||
 	    choice_result.type == ParseResultType::KEYWORD || choice_result.type == ParseResultType::STRING) {
 		return;
@@ -8268,7 +8268,7 @@ void PEGTransformerFactory::InitializeDefArgTrampoline(PEGTransformer &transform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8377,7 +8377,7 @@ void PEGTransformerFactory::InitializeMacroOrFunctionTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8441,7 +8441,7 @@ void PEGTransformerFactory::InitializeMacroDefinitionBodyTrampoline(PEGTransform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8486,7 +8486,7 @@ void PEGTransformerFactory::InitializeMacroParameterTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8697,7 +8697,7 @@ void PEGTransformerFactory::InitializeSequenceOptionTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8717,7 +8717,7 @@ void PEGTransformerFactory::InitializeSeqSetCycleTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8839,7 +8839,7 @@ void PEGTransformerFactory::InitializeSeqMinOrMaxTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -8932,7 +8932,7 @@ void PEGTransformerFactory::InitializeCreateStatementVariationTrampoline(PEGTran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -8964,7 +8964,7 @@ void PEGTransformerFactory::InitializeTemporaryTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9050,7 +9050,7 @@ void PEGTransformerFactory::InitializeCreateTableDefinitionTrampoline(PEGTransfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9118,7 +9118,7 @@ void PEGTransformerFactory::InitializePartitionSortedOptionsTrampoline(PEGTransf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9237,7 +9237,7 @@ void PEGTransformerFactory::InitializeWithDataTrampoline(PEGTransformer &transfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9344,7 +9344,7 @@ void PEGTransformerFactory::InitializeQualifiedNameTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9417,7 +9417,7 @@ void PEGTransformerFactory::InitializeIdentifierOrStringLiteralTrampoline(PEGTra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process &&
 	    (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	     choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR ||
@@ -9462,7 +9462,7 @@ void PEGTransformerFactory::InitializeReservedIdentifierOrStringLiteralTrampolin
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.Name().empty() || choice_result.type == ParseResultType::IDENTIFIER ||
 	    choice_result.type == ParseResultType::KEYWORD || choice_result.type == ParseResultType::STRING) {
 		return;
@@ -9599,7 +9599,7 @@ void PEGTransformerFactory::InitializeCreateTableColumnElementTrampoline(PEGTran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9714,7 +9714,7 @@ void PEGTransformerFactory::InitializeColumnConstraintTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9734,7 +9734,7 @@ void PEGTransformerFactory::InitializeNotNullConstraintTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -9936,7 +9936,7 @@ void PEGTransformerFactory::InitializeKeyActionTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -10050,7 +10050,7 @@ void PEGTransformerFactory::InitializeTopLevelConstraintListTrampoline(PEGTransf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10222,7 +10222,7 @@ void PEGTransformerFactory::InitializeColIdTrampoline(PEGTransformer &transforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.Name().empty() || choice_result.type == ParseResultType::IDENTIFIER ||
 	    choice_result.type == ParseResultType::KEYWORD || choice_result.type == ParseResultType::STRING) {
 		return;
@@ -10266,7 +10266,7 @@ void PEGTransformerFactory::InitializeColIdOrStringTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.Name().empty() || choice_result.type == ParseResultType::IDENTIFIER ||
 	    choice_result.type == ParseResultType::KEYWORD || choice_result.type == ParseResultType::STRING) {
 		return;
@@ -10305,7 +10305,7 @@ void PEGTransformerFactory::InitializeTypeFuncNameTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.Name().empty() || choice_result.type == ParseResultType::IDENTIFIER ||
 	    choice_result.type == ParseResultType::KEYWORD || choice_result.type == ParseResultType::STRING) {
 		return;
@@ -10348,7 +10348,7 @@ void PEGTransformerFactory::InitializeTypeFuncKeywordTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -10393,7 +10393,7 @@ void PEGTransformerFactory::InitializeColLabelTrampoline(PEGTransformer &transfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -10440,7 +10440,7 @@ void PEGTransformerFactory::InitializeColLabelOrStringTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.Name().empty() || choice_result.type == ParseResultType::IDENTIFIER ||
 	    choice_result.type == ParseResultType::KEYWORD || choice_result.type == ParseResultType::STRING) {
 		return;
@@ -10533,7 +10533,7 @@ void PEGTransformerFactory::InitializeGeneratedColumnTypeTrampoline(PEGTransform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10567,7 +10567,7 @@ void PEGTransformerFactory::InitializePreserveOrDeleteTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10681,7 +10681,7 @@ void PEGTransformerFactory::InitializeTriggerBodyTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10736,7 +10736,7 @@ void PEGTransformerFactory::InitializeReferencingItemTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10786,7 +10786,7 @@ void PEGTransformerFactory::InitializeTriggerTimingTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10839,7 +10839,7 @@ void PEGTransformerFactory::InitializeTriggerEventTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10931,7 +10931,7 @@ void PEGTransformerFactory::InitializeForEachClauseTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -10997,7 +10997,7 @@ void PEGTransformerFactory::InitializeCreateTypeTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -11300,7 +11300,7 @@ void PEGTransformerFactory::InitializeDescribeStatementTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -11431,7 +11431,7 @@ void PEGTransformerFactory::InitializeDescribeOrSummarizeTrampoline(PEGTransform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -11451,7 +11451,7 @@ void PEGTransformerFactory::InitializeShowTargetTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process && (choice_result.Name() == "ShowSpecialForm")) {
 		return;
 	}
@@ -11505,7 +11505,7 @@ void PEGTransformerFactory::InitializeDescribeTargetTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -11579,7 +11579,7 @@ void PEGTransformerFactory::InitializeShowOrDescribeTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -11610,7 +11610,7 @@ void PEGTransformerFactory::InitializeDescribeRuleTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -11699,7 +11699,7 @@ void PEGTransformerFactory::InitializeDropEntriesTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -11907,7 +11907,7 @@ void PEGTransformerFactory::InitializeQualifiedIndexNameTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12114,7 +12114,7 @@ void PEGTransformerFactory::InitializeTableOrViewTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12146,7 +12146,7 @@ void PEGTransformerFactory::InitializeFunctionTypeMacroTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12189,7 +12189,7 @@ void PEGTransformerFactory::InitializeDropBehaviorTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12355,7 +12355,7 @@ void PEGTransformerFactory::InitializeExplainOptionNameTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.Name().empty() || choice_result.type == ParseResultType::IDENTIFIER ||
 	    choice_result.type == ParseResultType::KEYWORD || choice_result.type == ParseResultType::STRING) {
 		return;
@@ -12405,7 +12405,7 @@ void PEGTransformerFactory::InitializeExplainableStatementsTrampoline(PEGTransfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12482,7 +12482,7 @@ void PEGTransformerFactory::InitializeColumnReferenceTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12735,7 +12735,7 @@ void PEGTransformerFactory::InitializeFunctionIdentifierTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12833,7 +12833,7 @@ void PEGTransformerFactory::InitializeDistinctOrAllTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -12936,7 +12936,7 @@ void PEGTransformerFactory::InitializeIgnoreOrRespectNullsTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13019,7 +13019,7 @@ void PEGTransformerFactory::InitializeConstantLiteralTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13105,7 +13105,7 @@ void PEGTransformerFactory::InitializeCastOrTryCastTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13247,7 +13247,7 @@ void PEGTransformerFactory::InitializeExcludeNamesTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13306,7 +13306,7 @@ void PEGTransformerFactory::InitializeExcludeNameTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13368,7 +13368,7 @@ void PEGTransformerFactory::InitializeReplaceEntriesTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13457,7 +13457,7 @@ void PEGTransformerFactory::InitializeRenameEntriesTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13697,7 +13697,7 @@ void PEGTransformerFactory::InitializeIntervalParameterTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13755,7 +13755,7 @@ void PEGTransformerFactory::InitializeFramingTrampoline(PEGTransformer &transfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -13829,7 +13829,7 @@ void PEGTransformerFactory::InitializeFrameExtentTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13879,7 +13879,7 @@ void PEGTransformerFactory::InitializeFrameBoundTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13940,7 +13940,7 @@ void PEGTransformerFactory::InitializePrecedingOrFollowingTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -13996,7 +13996,7 @@ void PEGTransformerFactory::InitializeWindowExcludeElementTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -14060,7 +14060,7 @@ void PEGTransformerFactory::InitializeWindowFrameTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -14107,7 +14107,7 @@ void PEGTransformerFactory::InitializeWindowFrameDefinitionTrampoline(PEGTransfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -14257,7 +14257,7 @@ void PEGTransformerFactory::InitializeListExpressionTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -14520,7 +14520,7 @@ void PEGTransformerFactory::InitializeGroupingOrGroupingIdTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -14562,7 +14562,7 @@ void PEGTransformerFactory::InitializeParameterTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -14727,7 +14727,7 @@ void PEGTransformerFactory::InitializeSingleExpressionTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -15177,7 +15177,7 @@ void PEGTransformerFactory::InitializeIsTestTrampoline(PEGTransformer &transform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -15215,7 +15215,7 @@ void PEGTransformerFactory::InitializeIsLiteralValueTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -15246,7 +15246,7 @@ void PEGTransformerFactory::InitializeNotNullTrampoline(PEGTransformer &transfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -15461,7 +15461,7 @@ void PEGTransformerFactory::InitializeComparisonOperatorTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -15591,7 +15591,7 @@ void PEGTransformerFactory::InitializeBetweenInLikeOpExpressionTrampoline(PEGTra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -15651,7 +15651,7 @@ void PEGTransformerFactory::InitializeLikeVariationsTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -15818,7 +15818,7 @@ void PEGTransformerFactory::InitializeInExpressionTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -15971,7 +15971,7 @@ void PEGTransformerFactory::InitializeOtherOperatorTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -16005,7 +16005,7 @@ void PEGTransformerFactory::InitializeNamedOtherOperatorTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process &&
 	    (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	     choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR ||
@@ -16087,7 +16087,7 @@ void PEGTransformerFactory::InitializeAnyOrAllTrampoline(PEGTransformer &transfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -16609,7 +16609,7 @@ void PEGTransformerFactory::InitializePrefixOperatorTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -16732,7 +16732,7 @@ void PEGTransformerFactory::InitializeIndirectionTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -16766,7 +16766,7 @@ void PEGTransformerFactory::InitializeDotOperatorTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -16991,7 +16991,7 @@ void PEGTransformerFactory::InitializeEndSliceValueTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17053,7 +17053,7 @@ void PEGTransformerFactory::InitializeSpecialFunctionExpressionTrampoline(PEGTra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17316,7 +17316,7 @@ void PEGTransformerFactory::InitializeSubstringArgumentsTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17378,7 +17378,7 @@ void PEGTransformerFactory::InitializeSubstringFromForTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17490,7 +17490,7 @@ void PEGTransformerFactory::InitializeTrimDirectionTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -17598,7 +17598,7 @@ void PEGTransformerFactory::InitializeOverlayArgumentsTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17699,7 +17699,7 @@ void PEGTransformerFactory::InitializeExtractArgumentTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17762,7 +17762,7 @@ void PEGTransformerFactory::InitializeExtractDatePartTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17782,7 +17782,7 @@ void PEGTransformerFactory::InitializeExternalResourceStatementTrampoline(PEGTra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -17973,7 +17973,7 @@ void PEGTransformerFactory::InitializeExternalResourceSourceTrampoline(PEGTransf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18101,7 +18101,7 @@ void PEGTransformerFactory::InitializeOrActionTrampoline(PEGTransformer &transfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18143,7 +18143,7 @@ void PEGTransformerFactory::InitializeByNameOrPositionTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18286,7 +18286,7 @@ void PEGTransformerFactory::InitializeInsertValuesTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18353,7 +18353,7 @@ void PEGTransformerFactory::InitializeOnConflictTargetTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18411,7 +18411,7 @@ void PEGTransformerFactory::InitializeOnConflictActionTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18599,7 +18599,7 @@ void PEGTransformerFactory::InitializeFromSourceTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18659,7 +18659,7 @@ void PEGTransformerFactory::InitializeExtensionRepositoryStatementTrampoline(PEG
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18848,7 +18848,7 @@ void PEGTransformerFactory::InitializeMergeMatchTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18890,7 +18890,7 @@ void PEGTransformerFactory::InitializeMatchedClauseActionTrampoline(PEGTransform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -18930,7 +18930,7 @@ void PEGTransformerFactory::InitializeUpdateMatchInfoTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19010,7 +19010,7 @@ void PEGTransformerFactory::InitializeInsertMatchInfoTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19143,7 +19143,7 @@ void PEGTransformerFactory::InitializeUpdateMatchSetInfoTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process && (choice_result.Name() == "StarSymbol")) {
 		return;
 	}
@@ -19214,7 +19214,7 @@ void PEGTransformerFactory::InitializeBySourceOrTargetTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19309,7 +19309,7 @@ void PEGTransformerFactory::InitializePivotColumnEntryTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19378,7 +19378,7 @@ void PEGTransformerFactory::InitializeOptionalParensNameListTrampoline(PEGTransf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19450,7 +19450,7 @@ void PEGTransformerFactory::InitializeIncludeOrExcludeNullsTrampoline(PEGTransfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19493,7 +19493,7 @@ void PEGTransformerFactory::InitializeUnpivotHeaderTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19566,7 +19566,7 @@ void PEGTransformerFactory::InitializePragmaAssignOrFunctionTrampoline(PEGTransf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19856,7 +19856,7 @@ void PEGTransformerFactory::InitializeSelectAtomTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19917,7 +19917,7 @@ void PEGTransformerFactory::InitializeSetopTypeTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -19959,7 +19959,7 @@ void PEGTransformerFactory::InitializeSelectStatementTypeTrampoline(PEGTransform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20007,7 +20007,7 @@ void PEGTransformerFactory::InitializeLimitOffsetTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20115,7 +20115,7 @@ void PEGTransformerFactory::InitializeOptionalParensSimpleSelectTrampoline(PEGTr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20150,7 +20150,7 @@ void PEGTransformerFactory::InitializeSelectFromTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20255,7 +20255,7 @@ void PEGTransformerFactory::InitializeCTEBodyTrampoline(PEGTransformer &transfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20411,7 +20411,7 @@ void PEGTransformerFactory::InitializeDistinctClauseTrampoline(PEGTransformer &t
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20487,7 +20487,7 @@ void PEGTransformerFactory::InitializeInnerTableRefTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20676,7 +20676,7 @@ void PEGTransformerFactory::InitializeJoinOrPivotTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20862,7 +20862,7 @@ void PEGTransformerFactory::InitializePivotValueTargetTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20964,7 +20964,7 @@ void PEGTransformerFactory::InitializeBaseTableNameTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -20998,7 +20998,7 @@ void PEGTransformerFactory::InitializeQualifiedTableNameTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21067,7 +21067,7 @@ void PEGTransformerFactory::InitializeTableFunctionTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21271,7 +21271,7 @@ void PEGTransformerFactory::InitializeFunctionArgumentTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21345,7 +21345,7 @@ void PEGTransformerFactory::InitializeTableAliasTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21439,7 +21439,7 @@ void PEGTransformerFactory::InitializeAtUnitTrampoline(PEGTransformer &transform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -21502,7 +21502,7 @@ void PEGTransformerFactory::InitializeJoinClauseTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21522,7 +21522,7 @@ void PEGTransformerFactory::InitializeNearestJoinClauseTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21624,7 +21624,7 @@ void PEGTransformerFactory::InitializeNearestBareTableRefTrampoline(PEGTransform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21767,7 +21767,7 @@ void PEGTransformerFactory::InitializeApproxOrExactTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21809,7 +21809,7 @@ void PEGTransformerFactory::InitializeDistanceOrSimilarityTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21930,7 +21930,7 @@ void PEGTransformerFactory::InitializeJoinQualifierTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -21981,7 +21981,7 @@ void PEGTransformerFactory::InitializeJoinTypeTrampoline(PEGTransformer &transfo
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22001,7 +22001,7 @@ void PEGTransformerFactory::InitializeJoinPrefixTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22261,7 +22261,7 @@ void PEGTransformerFactory::InitializeSampleEntryTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22421,7 +22421,7 @@ void PEGTransformerFactory::InitializeSampleValueTrampoline(PEGTransformer &tran
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22441,7 +22441,7 @@ void PEGTransformerFactory::InitializeSampleUnitTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22483,7 +22483,7 @@ void PEGTransformerFactory::InitializeGroupByExpressionsTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22539,7 +22539,7 @@ void PEGTransformerFactory::InitializeGroupByExpressionTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22627,7 +22627,7 @@ void PEGTransformerFactory::InitializeCubeOrRollupTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
@@ -22760,7 +22760,7 @@ void PEGTransformerFactory::InitializeDescOrAscTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22802,7 +22802,7 @@ void PEGTransformerFactory::InitializeNullsFirstOrLastTrampoline(PEGTransformer 
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22858,7 +22858,7 @@ void PEGTransformerFactory::InitializeOrderByExpressionsTrampoline(PEGTransforme
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -22978,7 +22978,7 @@ void PEGTransformerFactory::InitializeLimitValueTrampoline(PEGTransformer &trans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23067,7 +23067,7 @@ void PEGTransformerFactory::InitializeAliasedExpressionTrampoline(PEGTransformer
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23204,7 +23204,7 @@ void PEGTransformerFactory::InitializeSetAssignmentOrTimeZoneTrampoline(PEGTrans
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23268,7 +23268,7 @@ void PEGTransformerFactory::InitializeSetVariableOrSettingTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23302,7 +23302,7 @@ void PEGTransformerFactory::InitializeZoneValueTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23457,7 +23457,7 @@ void PEGTransformerFactory::InitializeSettingScopeTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23549,7 +23549,7 @@ void PEGTransformerFactory::InitializeTransactionStatementTrampoline(PEGTransfor
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23637,7 +23637,7 @@ void PEGTransformerFactory::InitializeReadOnlyOrReadWriteTrampoline(PEGTransform
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23729,7 +23729,7 @@ void PEGTransformerFactory::InitializeUpdateTargetTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23803,7 +23803,7 @@ void PEGTransformerFactory::InitializeUpdateSetClauseTrampoline(PEGTransformer &
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -23941,7 +23941,7 @@ void PEGTransformerFactory::InitializeUseTargetTrampoline(PEGTransformer &transf
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -24074,7 +24074,7 @@ void PEGTransformerFactory::InitializeVacuumOptionsTrampoline(PEGTransformer &tr
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (!has_transform_process) {
 		throw InternalException("No transform process registered for rule '%s'", choice_result.Name());
 	}
@@ -24163,7 +24163,7 @@ void PEGTransformerFactory::InitializeVacuumOptionTrampoline(PEGTransformer &tra
 	auto &choice_result = choice_pr.GetResult();
 	process.ReserveChildSlots(1);
 	auto child_rule = choice_result.GetRule();
-	auto has_transform_process = child_rule && child_rule->transform_process;
+	auto has_transform_process = child_rule && child_rule->HasTransform();
 	if (choice_result.type == ParseResultType::IDENTIFIER || choice_result.type == ParseResultType::KEYWORD ||
 	    choice_result.type == ParseResultType::STRING || choice_result.type == ParseResultType::OPERATOR) {
 		return;
