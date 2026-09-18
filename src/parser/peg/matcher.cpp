@@ -54,7 +54,6 @@ void MatchState::AddSuggestion(MatcherSuggestion suggestion) {
 
 Matcher &MatcherAllocator::Allocate(unique_ptr<Matcher> matcher) {
 	auto &result = *matcher;
-	result.packrat_id = optional_idx(matchers.size());
 	matchers.push_back(std::move(matcher));
 	return result;
 }

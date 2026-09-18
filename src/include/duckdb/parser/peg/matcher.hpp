@@ -302,8 +302,11 @@ public:
 	optional_idx GetPackratId() const {
 		return packrat_id;
 	}
-	void SetPackratMemoized() {
+	//! Mark the matcher as memoized. The id is a dense index over the memoized matchers of a grammar and is used
+	//! to index directly into the packrat cache.
+	void SetPackratMemoized(idx_t packrat_id_p) {
 		packrat_memoized = true;
+		packrat_id = optional_idx(packrat_id_p);
 	}
 	bool IsPackratMemoized() const {
 		return packrat_memoized;

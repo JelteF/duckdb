@@ -80,7 +80,7 @@ static LiteralChoiceTestResult MatchLiteralChoiceTest(const Matcher &matcher, co
 	TokenIterator iterator(tokens);
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator allocator;
-	ParserPackratCache packrat;
+	ParserPackratCache packrat(tokens.size(), 0);
 	idx_t max_position = 0;
 	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
 	MatchContext context(suggestions, allocator, process_allocator, max_position, mode,
@@ -894,7 +894,7 @@ TEST_CASE("Packrat results outlive reset process arenas", "[api][grammar_extensi
 	TokenIterator iterator(tokens);
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator parse_results;
-	ParserPackratCache cache;
+	ParserPackratCache cache(tokens.size(), 1);
 	idx_t max_token_index = 0;
 	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
 	MatchContext context(suggestions, parse_results, process_allocator, max_token_index);
@@ -905,7 +905,7 @@ TEST_CASE("Packrat results outlive reset process arenas", "[api][grammar_extensi
 	lifetime.create_result = true;
 	MatcherAllocator matchers;
 	auto &matcher = matchers.Allocate(make_uniq<ArenaNestedTestMatcher>(lifetime));
-	matcher.SetPackratMemoized();
+	matcher.SetPackratMemoized(0);
 	MatchStack stack;
 
 	SECTION("Cached successes retain separately allocated parse results") {

@@ -34,6 +34,10 @@ public:
 		return *tokenizer;
 	}
 	optional_ptr<const CompiledGrammarRule> GetRule(const string &rule_name) const;
+	//! Number of packrat-memoized matchers in this grammar, i.e. the range of Matcher::GetPackratId()
+	idx_t PackratMatcherCount() const {
+		return packrat_matcher_count;
+	}
 
 public:
 	static shared_ptr<CompiledGrammar> Get(ClientContext &context);
@@ -50,6 +54,7 @@ private:
 	case_insensitive_map_t<unique_ptr<CompiledGrammarRule>> rules;
 	const Matcher &program_matcher;
 	const Matcher &top_level_statement_matcher;
+	idx_t packrat_matcher_count = 0;
 };
 
 //! Per-database holder for the compiled base grammar.
