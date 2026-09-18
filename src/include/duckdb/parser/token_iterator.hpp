@@ -22,7 +22,9 @@ class TokenIterator {
 public:
 	DUCKDB_API explicit TokenIterator(unique_ptr<vector<MatcherToken>> owned_tokens);
 	DUCKDB_API explicit TokenIterator(vector<MatcherToken> &tokens);
-	DUCKDB_API TokenIterator(const TokenIterator &other);
+	//! Inline: a child MatchState is copied for nearly every matcher frame
+	TokenIterator(const TokenIterator &other) : tokens(other.tokens), position(other.position) {
+	}
 	DUCKDB_API TokenIterator(TokenIterator &&other) noexcept;
 	TokenIterator &operator=(const TokenIterator &) = delete;
 	TokenIterator &operator=(TokenIterator &&) = delete;
