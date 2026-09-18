@@ -37,8 +37,10 @@ public:
 	const Matcher &matcher;
 	MatchState &match_state;
 	arena_ptr<MatchProcess> process;
-	optional<MatcherResult> child_result;
-	optional<MatcherResult> result;
+	MatcherResult child_result = MatcherResult::Failure();
+	MatcherResult result = MatcherResult::Failure();
+	bool has_child_result = false;
+	bool has_result = false;
 	PackratMatchState packrat_state;
 };
 

@@ -12,13 +12,18 @@ namespace duckdb {
 //! children of a successful match are copied into the longer-lived parse result arena.
 class ChildCollector {
 public:
-	ChildCollector(MatchState &state, idx_t initial_capacity) : arena(state.context.process_allocator) {
+	//! Most rules have a handful of children, which fit in the collector itself
+	static constexpr idx_t INLINE_CAPACITY = 6;
+
+public:
+	ChildCollector(MatchState &state, idx_t initial_capacity)
+	    : arena(state.context.process_allocator), children(InlineChildren()), capacity(INLINE_CAPACITY) {
 		Reserve(initial_capacity);
 	}
 
 	void Add(ParseResult &result) {
 		if (count == capacity) {
-			Reserve(capacity == 0 ? 4 : capacity * 2);
+			Reserve(capacity * 2);
 		}
 		new (children + count) reference<ParseResult>(result);
 		count++;
@@ -54,36 +59,24 @@ private:
 	}
 
 private:
+	reference<ParseResult> *InlineChildren() {
+		return reinterpret_cast<reference<ParseResult> *>(inline_storage);
+	}
+
+private:
 	ArenaAllocator &arena;
-	reference<ParseResult> *children = nullptr;
+	reference<ParseResult> *children;
 	idx_t count = 0;
-	idx_t capacity = 0;
+	idx_t capacity;
+	alignas(reference<ParseResult>) char inline_storage[INLINE_CAPACITY * sizeof(reference<ParseResult>)];
 };
-
-MatchStep MatchStep::Child(MatchInput input) {
-	return MatchStep(input, nullopt);
-}
-
-MatchStep MatchStep::Complete(MatcherResult result) {
-	return MatchStep(nullopt, result);
-}
-
-optional<MatchInput> MatchStep::GetChild() {
-	return child;
-}
-
-MatcherResult MatchStep::GetResult() const {
-	D_ASSERT(!child);
-	D_ASSERT(result);
-	return result.value();
-}
 
 class AtomicMatchProcess : public MatchProcess {
 public:
 	AtomicMatchProcess(const AtomicMatcher &matcher_p, MatchState &state_p) : matcher(matcher_p), state(state_p) {
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
+	MatchStep Resume(const MatcherResult *child_result) override {
 		D_ASSERT(!child_result);
 		D_ASSERT(!completed);
 		completed = true;
@@ -110,8 +103,8 @@ public:
 		}
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
-		D_ASSERT(awaiting_child == child_result.has_value());
+	MatchStep Resume(const MatcherResult *child_result) override {
+		D_ASSERT(awaiting_child == (child_result != nullptr));
 		if (child_result) {
 			awaiting_child = false;
 			if (!child_result->IsSuccess()) {
@@ -219,8 +212,8 @@ public:
 		}
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
-		D_ASSERT(awaiting_child == child_result.has_value());
+	MatchStep Resume(const MatcherResult *child_result) override {
+		D_ASSERT(awaiting_child == (child_result != nullptr));
 		if (child_result) {
 			awaiting_child = false;
 			D_ASSERT(child_state);
@@ -280,8 +273,8 @@ public:
 		}
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
-		D_ASSERT(awaiting_child == child_result.has_value());
+	MatchStep Resume(const MatcherResult *child_result) override {
+		D_ASSERT(awaiting_child == (child_result != nullptr));
 		if (!child_result) {
 			if (!matcher.GetChildMatcher().MayMatchHere(child_state)) {
 				return MatchStep::Complete(EmptyResult());
@@ -330,8 +323,8 @@ public:
 		}
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
-		D_ASSERT(awaiting_child == child_result.has_value());
+	MatchStep Resume(const MatcherResult *child_result) override {
+		D_ASSERT(awaiting_child == (child_result != nullptr));
 		if (child_result) {
 			awaiting_child = false;
 			if (!child_result->IsSuccess()) {

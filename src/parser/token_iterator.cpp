@@ -22,9 +22,6 @@ TokenIterator::TokenIterator(vector<MatcherToken> &tokens_p) : tokens(tokens_p) 
 	}
 }
 
-TokenIterator::TokenIterator(const TokenIterator &other) : tokens(other.tokens), position(other.position) {
-}
-
 TokenIterator::TokenIterator(TokenIterator &&other) noexcept
     : owned_tokens(std::move(other.owned_tokens)), tokens(other.tokens), position(other.position) {
 }
