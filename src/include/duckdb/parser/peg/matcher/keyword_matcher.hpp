@@ -57,15 +57,22 @@ public:
 		return optional_idx();
 	}
 
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		return KeywordMatches(state);
+	}
+
 private:
-	bool MatchKeyword(MatchState &state) const {
+	bool KeywordMatches(MatchState &state) const {
 		auto token = state.token_iterator.Current();
 		if (!token) {
 			return false;
 		}
-		const auto matches = literal_table ? state.token_iterator.CurrentLiteralInfo(*literal_table) == literal_info
-		                                   : StringUtil::CIEquals(keyword, token->text);
-		if (matches) {
+		return literal_table ? state.token_iterator.CurrentLiteralInfo(*literal_table) == literal_info
+		                     : StringUtil::CIEquals(keyword, token->text);
+	}
+
+	bool MatchKeyword(MatchState &state) const {
+		if (KeywordMatches(state)) {
 			// move to the next token
 			state.token_iterator.Advance();
 			state.UpdateMaxTokenIndex();
