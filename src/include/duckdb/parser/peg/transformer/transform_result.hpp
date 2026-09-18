@@ -1,6 +1,7 @@
 #pragma once
 
 #include "duckdb/common/common.hpp"
+#include "duckdb/common/arena_containers/arena_ptr.hpp"
 
 #include <cstring>
 
@@ -29,6 +30,12 @@ template <class T>
 const char *TransformResultTypeName() {
 	return TransformResultTypeIdentifier<T>::GetName();
 }
+
+struct TransformResultValue;
+
+//! A transform result lives exactly as long as the transform run that produced it, so it is carved out of the
+//! transformer's arena; the pointer only runs the destructor.
+using transform_result_ptr = arena_ptr<TransformResultValue>;
 
 struct DUCKDB_API TransformResultValue {
 	virtual ~TransformResultValue() = default;
