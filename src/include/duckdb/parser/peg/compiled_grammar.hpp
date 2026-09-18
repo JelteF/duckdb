@@ -16,7 +16,7 @@ struct CompiledGrammar {
 public:
 	CompiledGrammar(MatcherAllocator &&allocator, unique_ptr<PEGKeywordHelper> &&keyword_helper,
 	                unique_ptr<Tokenizer> &&tokenizer, compiled_rules_map_t &&rules, const Matcher &program_matcher,
-	                const Matcher &top_level_statement_matcher);
+	                const Matcher &top_level_statement_matcher, idx_t packrat_matcher_count);
 	static shared_ptr<CompiledGrammar>
 	Create(const case_insensitive_map_t<reference<GrammarExtension>> &grammar_extensions);
 
@@ -54,7 +54,7 @@ private:
 	case_insensitive_map_t<unique_ptr<CompiledGrammarRule>> rules;
 	const Matcher &program_matcher;
 	const Matcher &top_level_statement_matcher;
-	idx_t packrat_matcher_count = 0;
+	idx_t packrat_matcher_count;
 };
 
 //! Per-database holder for the compiled base grammar.
