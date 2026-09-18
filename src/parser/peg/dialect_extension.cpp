@@ -50,6 +50,7 @@ shared_ptr<CompiledGrammar> DialectExtension::GetCompiledGrammar(const ClientCon
 	auto &program_matcher = matcher_factory->CreateRootMatcher("Program");
 	auto &top_level_statement_matcher = matcher_factory->GetMatcher("TopLevelStatement");
 	allocator.ComputeStartSets();
+	matcher_factory->IndexStartSets();
 
 	auto result = shared_ptr<CompiledGrammar>(new CompiledGrammar(std::move(allocator), std::move(keyword_helper),
 	                                                              std::move(tokenizer), std::move(rules),
