@@ -264,11 +264,20 @@ enum class MatcherType {
 	CUSTOM
 };
 
+//! Which tokens a matcher can start with, computed once per grammar by MatcherAllocator::ComputeStartSets. Used by
+//! Matcher::MayMatchHere to skip matchers that cannot match at the current token without pushing a frame for them.
+struct MatcherStartSet {
+	//! Anything may start this matcher (custom or untyped atomic matchers, or a cycle in the grammar): never prune
+	bool any = false;
+	optional_ptr<const GrammarLiteralTable> literal_table;
+	//! Sorted literal ids of the keywords that can start the matcher
+	vector<uint16_t> literal_ids;
+	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
+	vector<reference<const Matcher>> predicate_leaders;
+};
+
 class Matcher {
 public:
-	//! How deep CanStartWith looks into nested lists and choices before giving up and answering "maybe"
-	static constexpr idx_t MAX_START_CHECK_DEPTH = 8;
-
 	explicit Matcher(MatcherType type = MatcherType::CUSTOM) : type(type) {
 	}
 	virtual ~Matcher() = default;
@@ -285,8 +294,12 @@ public:
 	//! matchers, nullable children, deep nesting) answers true. Never prunes at the autocomplete cursor, where the
 	//! failing children are what produce the suggestions.
 	bool MayMatchHere(MatchState &state) const;
+	//! Token predicate for atomic matchers, consulted through the start sets; composite matchers never override it
 	virtual bool CanStartWith(MatchState &state, idx_t depth) const {
 		return true;
+	}
+	bool IsNullable() const {
+		return nullable;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;
@@ -347,6 +360,10 @@ protected:
 	optional_idx packrat_id;
 	bool packrat_memoized = false;
 	optional_ptr<const CompiledGrammarRule> rule;
+	//! See MatcherStartSet; null until MatcherAllocator::ComputeStartSets ran (MayMatchHere then falls back to the
+	//! matcher's own CanStartWith)
+	unique_ptr<MatcherStartSet> start_set;
+	bool nullable = false;
 };
 
 class AtomicMatcher : public Matcher {
@@ -377,6 +394,8 @@ public:
 class MatcherAllocator {
 public:
 	Matcher &Allocate(unique_ptr<Matcher> matcher);
+	//! Compute MatcherStartSet for every allocated matcher. Called once the matcher graph of a grammar is complete.
+	void ComputeStartSets();
 
 private:
 	vector<unique_ptr<Matcher>> matchers;
