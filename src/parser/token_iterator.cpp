@@ -13,6 +13,7 @@ TokenIterator::TokenIterator(unique_ptr<vector<MatcherToken>> owned_tokens_p)
 	for (auto &token : tokens) {
 		token.ResetLiteralInfo();
 	}
+	InitializeAutocompleteCursor();
 }
 
 TokenIterator::TokenIterator(vector<MatcherToken> &tokens_p) : tokens(tokens_p) {
@@ -20,10 +21,12 @@ TokenIterator::TokenIterator(vector<MatcherToken> &tokens_p) : tokens(tokens_p) 
 	for (auto &token : tokens) {
 		token.ResetLiteralInfo();
 	}
+	InitializeAutocompleteCursor();
 }
 
 TokenIterator::TokenIterator(TokenIterator &&other) noexcept
-    : owned_tokens(std::move(other.owned_tokens)), tokens(other.tokens), position(other.position) {
+    : owned_tokens(std::move(other.owned_tokens)), tokens(other.tokens), position(other.position),
+      has_autocomplete_cursor(other.has_autocomplete_cursor) {
 }
 
 bool TokenIterator::AtEnd() const {

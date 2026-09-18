@@ -23,7 +23,8 @@ public:
 	DUCKDB_API explicit TokenIterator(unique_ptr<vector<MatcherToken>> owned_tokens);
 	DUCKDB_API explicit TokenIterator(vector<MatcherToken> &tokens);
 	//! Inline: a child MatchState is copied for nearly every matcher frame
-	TokenIterator(const TokenIterator &other) : tokens(other.tokens), position(other.position) {
+	TokenIterator(const TokenIterator &other)
+	    : tokens(other.tokens), position(other.position), has_autocomplete_cursor(other.has_autocomplete_cursor) {
 	}
 	DUCKDB_API TokenIterator(TokenIterator &&other) noexcept;
 	TokenIterator &operator=(const TokenIterator &) = delete;
@@ -42,9 +43,11 @@ public:
 		}
 		return tokens[position];
 	}
-	//! True when the stream was tokenized for auto-completion, which puts the cursor token at the end
+	//! True when the stream was tokenized for auto-completion, which puts the cursor token at the end. Answered from
+	//! a flag rather than from the last token: this is asked once per matcher frame, and the end of a long token
+	//! stream is nowhere near the tokens the matcher is looking at.
 	bool HasAutocompleteCursor() const {
-		return !tokens.empty() && tokens.back().type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
+		return has_autocomplete_cursor;
 	}
 	LiteralInfo CurrentLiteralInfo(const GrammarLiteralTable &table) {
 		if (position >= tokens.size()) {
@@ -64,9 +67,15 @@ public:
 	DUCKDB_API string ToString() const;
 
 private:
+	void InitializeAutocompleteCursor() {
+		has_autocomplete_cursor = !tokens.empty() && tokens.back().type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
+	}
+
+private:
 	unique_ptr<vector<MatcherToken>> owned_tokens;
 	vector<MatcherToken> &tokens;
 	idx_t position = 0;
+	bool has_autocomplete_cursor = false;
 };
 
 } // namespace duckdb
