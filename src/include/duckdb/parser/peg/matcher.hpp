@@ -267,7 +267,7 @@ enum class MatcherType {
 class Matcher {
 public:
 	//! How deep CanStartWith looks into nested lists and choices before giving up and answering "maybe"
-	static constexpr idx_t MAX_START_CHECK_DEPTH = 4;
+	static constexpr idx_t MAX_START_CHECK_DEPTH = 8;
 
 	explicit Matcher(MatcherType type = MatcherType::CUSTOM) : type(type) {
 	}

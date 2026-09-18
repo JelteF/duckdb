@@ -74,13 +74,8 @@ public:
 			auto current = list_state.token_iterator.Current();
 			bool at_autocomplete_cursor = current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
 			if (!at_autocomplete_cursor) {
-				auto &child = matcher.matchers[child_index].get();
-				if (!child.MayMatchHere(list_state)) {
-					DiscardSuggestions();
-					return MatchStep::Complete(MatcherResult::Failure());
-				}
 				awaiting_child = true;
-				return MatchStep::Child({child, list_state});
+				return MatchStep::Child({matcher.matchers[child_index].get(), list_state});
 			}
 			if (matcher.suppress_suggestions) {
 				DiscardSuggestions();

@@ -175,6 +175,11 @@ private:
 		return keyword_helper.KeywordCategoryType(token_text, GetAllowedCategory());
 	}
 
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		auto token = state.token_iterator.Current();
+		return token && IsAllowedKeyword(state.token_iterator, token->text) && IsIdentifier(token->text);
+	}
+
 	bool MatchIdentifier(MatchState &state) const {
 		auto token = state.token_iterator.Current();
 		if (!token) {
@@ -228,6 +233,11 @@ public:
 			state.FoldIdentifier(result_text);
 		}
 		return state.AllocateParseResult<IdentifierParseResult>(result_text, start_offset, token_length);
+	}
+
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		auto token = state.token_iterator.Current();
+		return token && IsIdentifier(token->text);
 	}
 
 private:
