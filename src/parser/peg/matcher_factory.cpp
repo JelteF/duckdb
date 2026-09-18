@@ -336,7 +336,7 @@ void MatcherFactory::BuildPrecedenceLadder(const string &root_rule) {
 		chain.push_back(*current);
 		auto &operand = *level.operand;
 		current = operand.Type() == MatcherType::LIST ? optional_ptr<ListMatcher>(&operand.Cast<ListMatcher>())
-		                                             : optional_ptr<ListMatcher>();
+		                                              : optional_ptr<ListMatcher>();
 	}
 	if (ladder->levels.size() < 2 || ladder->levels.size() > PrecedenceLadder::MAX_LEVELS) {
 		return;

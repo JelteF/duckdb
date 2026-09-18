@@ -473,8 +473,8 @@ public:
 			return ParseResultChildren();
 		}
 		arena.AlignNext();
-		auto target = reinterpret_cast<reference<ParseResult> *>(
-		    arena.Allocate(count * sizeof(reference<ParseResult>)));
+		auto target =
+		    reinterpret_cast<reference<ParseResult> *>(arena.Allocate(count * sizeof(reference<ParseResult>)));
 		memcpy(static_cast<void *>(target), static_cast<const void *>(children),
 		       count * sizeof(reference<ParseResult>));
 		return ParseResultChildren(target, count);

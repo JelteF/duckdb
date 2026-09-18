@@ -274,8 +274,8 @@ void PEGTransformerFactory::InitializeSimpleSelectTrampoline(PEGTransformer &tra
 	PushSimpleSelectRemainder(process);
 }
 
-transform_result_ptr
-PEGTransformerFactory::FinalizeSimpleSelectTrampoline(PEGTransformer &transformer, GeneratedTransformProcess &process) {
+transform_result_ptr PEGTransformerFactory::FinalizeSimpleSelectTrampoline(PEGTransformer &transformer,
+                                                                           GeneratedTransformProcess &process) {
 	if (process.manual_state == 0) {
 		process.TakeResult<vector<unique_ptr<ParsedExpression>>>(4);
 		process.manual_state = 1;
@@ -395,7 +395,7 @@ void PEGTransformerFactory::InitializeTableRefTrampoline(PEGTransformer &transfo
 }
 
 transform_result_ptr PEGTransformerFactory::FinalizeTableRefTrampoline(PEGTransformer &transformer,
-                                                                                   GeneratedTransformProcess &process) {
+                                                                       GeneratedTransformProcess &process) {
 	auto &list_pr = process.parse_result.Cast<ListParseResult>();
 	auto inner_table_ref = process.TakeResult<unique_ptr<TableRef>>(0);
 	auto &join_or_pivot_opt = list_pr.Child<OptionalParseResult>(1);
@@ -1038,8 +1038,8 @@ void PEGTransformerFactory::InitializeWithClauseTrampoline(PEGTransformer &trans
 	}
 }
 
-transform_result_ptr
-PEGTransformerFactory::FinalizeWithClauseTrampoline(PEGTransformer &transformer, GeneratedTransformProcess &process) {
+transform_result_ptr PEGTransformerFactory::FinalizeWithClauseTrampoline(PEGTransformer &transformer,
+                                                                         GeneratedTransformProcess &process) {
 	auto &list_pr = process.parse_result.Cast<ListParseResult>();
 	bool is_recursive = list_pr.Child<OptionalParseResult>(1).HasResult();
 	CommonTableExpressionMap result;
@@ -1138,9 +1138,8 @@ void PEGTransformerFactory::InitializeWindowDefinitionTrampoline(PEGTransformer 
 	process.PushChild({list_pr.GetChild(2)}, 0);
 }
 
-transform_result_ptr
-PEGTransformerFactory::FinalizeWindowDefinitionTrampoline(PEGTransformer &transformer,
-                                                          GeneratedTransformProcess &process) {
+transform_result_ptr PEGTransformerFactory::FinalizeWindowDefinitionTrampoline(PEGTransformer &transformer,
+                                                                               GeneratedTransformProcess &process) {
 	auto &list_pr = process.parse_result.Cast<ListParseResult>();
 	auto window_function = process.TakeResult<unique_ptr<WindowExpression>>(0);
 	transformer.in_window_definition = false;

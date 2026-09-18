@@ -53,8 +53,7 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformTopLevelStatement(Token
 	}
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator parse_result_allocator;
-	ParserPackratCache packrat_cache(token_iterator.Position(), token_iterator.Size(),
-	                                 grammar.PackratMatcherCount());
+	ParserPackratCache packrat_cache(token_iterator.Position(), token_iterator.Size(), grammar.PackratMatcherCount());
 	idx_t max_token_index = token_iterator.Position();
 	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
 	MatchContext match_context(suggestions, parse_result_allocator, process_allocator, max_token_index,
@@ -117,7 +116,7 @@ PEGTransformerFactory::PEGTransformerFactory(ParsedGrammar &grammar_p) : grammar
 		    entry.first,
 		    [process_info](PEGTransformer &transformer, ParseResult &parse_result) -> arena_ptr<TransformProcess> {
 			    return transformer.MakeProcess<GeneratedTransformProcess>(transformer, TransformInput {parse_result},
-			                                                             *process_info);
+			                                                              *process_info);
 		    });
 	}
 }

@@ -81,9 +81,8 @@ void PEGTransformerFactory::InitializePivotStatementTrampoline(PEGTransformer &t
 	process.PushChild({list_pr.GetChild(1)}, 0);
 }
 
-transform_result_ptr
-PEGTransformerFactory::FinalizePivotStatementTrampoline(PEGTransformer &transformer,
-                                                        GeneratedTransformProcess &process) {
+transform_result_ptr PEGTransformerFactory::FinalizePivotStatementTrampoline(PEGTransformer &transformer,
+                                                                             GeneratedTransformProcess &process) {
 	auto &list_pr = process.parse_result.Cast<ListParseResult>();
 	if (!process.child_results[4]) {
 		bool has_parameters = transformer.ParamCount() > process.manual_state;
@@ -222,9 +221,8 @@ void PEGTransformerFactory::InitializeUnpivotStatementTrampoline(PEGTransformer 
 	process.PushChild({list_pr.GetChild(1)}, 0);
 }
 
-transform_result_ptr
-PEGTransformerFactory::FinalizeUnpivotStatementTrampoline(PEGTransformer &transformer,
-                                                          GeneratedTransformProcess &process) {
+transform_result_ptr PEGTransformerFactory::FinalizeUnpivotStatementTrampoline(PEGTransformer &transformer,
+                                                                               GeneratedTransformProcess &process) {
 	auto &list_pr = process.parse_result.Cast<ListParseResult>();
 	if (!process.child_results[3]) {
 		bool has_parameters = transformer.ParamCount() > process.manual_state;

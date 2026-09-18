@@ -421,8 +421,7 @@ private:
 	ParseResult &parse_result;
 };
 
-static arena_ptr<TransformProcess> StartGrammarExtensionTestValueTransform(PEGTransformer &transformer,
-                                                                           ParseResult &) {
+static arena_ptr<TransformProcess> StartGrammarExtensionTestValueTransform(PEGTransformer &transformer, ParseResult &) {
 	return transformer.MakeProcess<GrammarExtensionTestValueTransformProcess>(transformer);
 }
 

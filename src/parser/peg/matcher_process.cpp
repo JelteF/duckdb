@@ -52,8 +52,8 @@ private:
 			return;
 		}
 		arena.AlignNext();
-		auto target = reinterpret_cast<reference<ParseResult> *>(
-		    arena.Allocate(new_capacity * sizeof(reference<ParseResult>)));
+		auto target =
+		    reinterpret_cast<reference<ParseResult> *>(arena.Allocate(new_capacity * sizeof(reference<ParseResult>)));
 		if (count > 0) {
 			memcpy(static_cast<void *>(target), static_cast<const void *>(children),
 			       count * sizeof(reference<ParseResult>));
@@ -453,7 +453,6 @@ private:
 	Stage stage = Stage::START;
 };
 
-
 template <bool SINGLE_CHILD>
 class ChoiceMatchProcess : public MatchProcess {
 public:
@@ -642,8 +641,8 @@ public:
 				results.Add(*child_result->GetParseResult());
 			}
 			state.token_iterator.SetPosition(repeat_state.token_iterator);
-			auto current = repeat_state.token_iterator.HasAutocompleteCursor() ? repeat_state.token_iterator.Current()
-			                                                                  : nullptr;
+			auto current =
+			    repeat_state.token_iterator.HasAutocompleteCursor() ? repeat_state.token_iterator.Current() : nullptr;
 			if (current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
 				matcher.GetChildMatcher().AddSuggestion(state);
 				return MatchStep::Complete(CreateResult());
