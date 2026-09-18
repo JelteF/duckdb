@@ -390,7 +390,11 @@ MatcherResult MatchState::AllocateParseResult(ARGS &&... args) {
 	auto result = context.allocator.Allocate(make_uniq<RESULT>(std::forward<ARGS>(args)...));
 	if (rule) {
 		result->SetRule(*rule);
-		result->name = rule->name;
+		// List results already carry the matcher name, which SetRule keeps identical to the rule name; skip the
+		// second string copy in that case
+		if (result->name.empty()) {
+			result->name = rule->name;
+		}
 	}
 	return MatcherResult::Success(result);
 }
