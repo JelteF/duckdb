@@ -74,8 +74,13 @@ public:
 			auto current = list_state.token_iterator.Current();
 			bool at_autocomplete_cursor = current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
 			if (!at_autocomplete_cursor) {
+				auto &child = matcher.matchers[child_index].get();
+				if (!child.MayMatchHere(list_state)) {
+					DiscardSuggestions();
+					return MatchStep::Complete(MatcherResult::Failure());
+				}
 				awaiting_child = true;
-				return MatchStep::Child({matcher.matchers[child_index].get(), list_state});
+				return MatchStep::Child({child, list_state});
 			}
 			if (matcher.suppress_suggestions) {
 				DiscardSuggestions();
@@ -174,6 +179,11 @@ public:
 			child_index++;
 			child_state.reset();
 		}
+		if (!SINGLE_CHILD) {
+			while (child_index < matcher.matchers.size() && !matcher.matchers[child_index].get().MayMatchHere(state)) {
+				child_index++;
+			}
+		}
 		if (child_index >= matcher.matchers.size()) {
 			return MatchStep::Complete(MatcherResult::Failure());
 		}
@@ -214,6 +224,9 @@ public:
 	MatchStep Resume(optional<MatcherResult> child_result) override {
 		D_ASSERT(awaiting_child == child_result.has_value());
 		if (!child_result) {
+			if (!matcher.GetChildMatcher().MayMatchHere(child_state)) {
+				return MatchStep::Complete(state.AllocateParseResult<OptionalParseResult>());
+			}
 			awaiting_child = true;
 			return MatchStep::Child({matcher.GetChildMatcher(), child_state});
 		}
@@ -270,6 +283,12 @@ public:
 				matcher.GetChildMatcher().AddSuggestion(state);
 				return MatchStep::Complete(CreateResult());
 			}
+		}
+		if (!matcher.GetChildMatcher().MayMatchHere(repeat_state)) {
+			if (!matched_once) {
+				return MatchStep::Complete(MatcherResult::Failure());
+			}
+			return MatchStep::Complete(CreateResult());
 		}
 		awaiting_child = true;
 		return MatchStep::Child({matcher.GetChildMatcher(), repeat_state});

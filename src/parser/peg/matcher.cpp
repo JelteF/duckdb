@@ -52,6 +52,14 @@ void MatchState::AddSuggestion(MatcherSuggestion suggestion) {
 	context.suggestions.push_back(std::move(suggestion));
 }
 
+bool Matcher::MayMatchHere(MatchState &state) const {
+	auto token = state.token_iterator.Current();
+	if (!token || token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
+		return true;
+	}
+	return CanStartWith(state, 0);
+}
+
 Matcher &MatcherAllocator::Allocate(unique_ptr<Matcher> matcher) {
 	auto &result = *matcher;
 	matchers.push_back(std::move(matcher));

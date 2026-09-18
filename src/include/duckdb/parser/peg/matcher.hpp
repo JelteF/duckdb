@@ -266,6 +266,9 @@ enum class MatcherType {
 
 class Matcher {
 public:
+	//! How deep CanStartWith looks into nested lists and choices before giving up and answering "maybe"
+	static constexpr idx_t MAX_START_CHECK_DEPTH = 4;
+
 	explicit Matcher(MatcherType type = MatcherType::CUSTOM) : type(type) {
 	}
 	virtual ~Matcher() = default;
@@ -276,6 +279,14 @@ public:
 	virtual arena_ptr<MatchProcess> StartMatch(MatchState &state) const = 0;
 	virtual bool IsAtomic() const {
 		return false;
+	}
+	//! Cheap, conservative pre-check used to skip matchers that cannot possibly match at the current token, without
+	//! pushing a frame for them. Returns false only when a match is certainly impossible; anything unsure (custom
+	//! matchers, nullable children, deep nesting) answers true. Never prunes at the autocomplete cursor, where the
+	//! failing children are what produce the suggestions.
+	bool MayMatchHere(MatchState &state) const;
+	virtual bool CanStartWith(MatchState &state, idx_t depth) const {
+		return true;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;

@@ -13,6 +13,9 @@ public:
 	}
 
 	DUCKDB_API arena_ptr<MatchProcess> StartMatch(MatchState &state) const override;
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		return element.CanStartWith(state, depth + 1);
+	}
 
 	SuggestionType AddSuggestionInternal(MatchState &state) const override {
 		element.AddSuggestion(state);

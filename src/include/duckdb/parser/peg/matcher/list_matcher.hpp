@@ -15,6 +15,13 @@ public:
 	}
 
 	DUCKDB_API arena_ptr<MatchProcess> StartMatch(MatchState &state) const override;
+	//! Only the first element decides; a nullable first element answers true itself, which keeps this conservative
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		if (matchers.empty() || depth >= MAX_START_CHECK_DEPTH) {
+			return true;
+		}
+		return matchers[0].get().CanStartWith(state, depth + 1);
+	}
 
 	SuggestionType AddSuggestionInternal(MatchState &state) const override {
 		if (suppress_suggestions) {
