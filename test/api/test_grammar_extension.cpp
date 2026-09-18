@@ -114,12 +114,12 @@ TEST_CASE("Literal choice dispatch preserves ordered choice results", "[api][gra
 		MatchContext context(suggestions, parse_results, process_allocator, max_position);
 		MatchState state(iterator, context);
 		auto process = choice.StartMatch(state);
-		auto step = process->Resume(nullopt);
+		auto step = process->Resume(nullptr);
 		if (text == "WHERE") {
-			REQUIRE(step.GetChild());
-			REQUIRE(&step.GetChild()->matcher == &choice.matchers[3].get());
+			REQUIRE(step.HasChild());
+			REQUIRE(&step.GetChild().matcher == &choice.matchers[3].get());
 		} else {
-			REQUIRE_FALSE(step.GetChild());
+			REQUIRE_FALSE(step.HasChild());
 			REQUIRE_FALSE(step.GetResult().IsSuccess());
 		}
 	}
@@ -531,8 +531,8 @@ public:
 	    : child(child_p), state(state_p), child_state(state_p) {
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
-		D_ASSERT(awaiting_child == child_result.has_value());
+	MatchStep Resume(const MatcherResult *child_result) override {
+		D_ASSERT(awaiting_child == (child_result != nullptr));
 		if (!child_result) {
 			awaiting_child = true;
 			return MatchStep::Child({child, child_state});
@@ -685,7 +685,7 @@ public:
 		lifetime.active--;
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
+	MatchStep Resume(const MatcherResult *child_result) override {
 		if (child_result) {
 			if (depth == 1 && ++completed_children < lifetime.root_children) {
 				return MatchStep::Child({matcher, child_state});
