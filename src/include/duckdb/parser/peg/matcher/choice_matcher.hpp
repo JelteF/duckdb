@@ -16,6 +16,17 @@ public:
 	}
 
 	DUCKDB_API arena_ptr<MatchProcess> StartMatch(MatchState &state) const override;
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		if (depth >= MAX_START_CHECK_DEPTH) {
+			return true;
+		}
+		for (auto &child_matcher : matchers) {
+			if (child_matcher.get().CanStartWith(state, depth + 1)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	SuggestionType AddSuggestionInternal(MatchState &state) const override {
 		for (auto &child_matcher : matchers) {
