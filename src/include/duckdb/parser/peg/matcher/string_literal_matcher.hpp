@@ -64,6 +64,11 @@ public:
 		return SuggestionType::MANDATORY;
 	}
 
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		auto token = state.token_iterator.Current();
+		return token && IsStringLiteral(*token, GetSpecialStringInfo(token->text));
+	}
+
 	string ToString() const override {
 		return "STRING_LITERAL";
 	}

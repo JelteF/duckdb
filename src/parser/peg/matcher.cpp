@@ -81,7 +81,8 @@ bool Matcher::MayMatchHere(MatchState &state) const {
 	}
 	if (!set.literal_ids.empty()) {
 		auto literal_id = state.token_iterator.CurrentLiteralInfo(*set.literal_table).LiteralId();
-		if (literal_id && std::binary_search(set.literal_ids.begin(), set.literal_ids.end(), literal_id)) {
+		if (literal_id && (set.literal_signature & MatcherStartSet::SignatureBit(literal_id)) &&
+		    std::binary_search(set.literal_ids.begin(), set.literal_ids.end(), literal_id)) {
 			return true;
 		}
 	}
@@ -161,7 +162,10 @@ public:
 		}
 		case MatcherType::VARIABLE:
 		case MatcherType::OPERATOR:
-			// identifier and operator matchers implement CanStartWith
+		case MatcherType::NUMBER_LITERAL:
+		case MatcherType::STRING_LITERAL:
+		case MatcherType::END_OF_INPUT:
+			// these answer CanStartWith from the token itself
 			set->predicate_leaders.push_back(matcher);
 			break;
 		default:
@@ -172,7 +176,9 @@ public:
 			auto bits = entry.literal_bits[word];
 			while (bits) {
 				auto bit = static_cast<idx_t>(__builtin_ctzll(bits));
-				set->literal_ids.push_back(static_cast<uint16_t>(word * 64 + bit));
+				auto literal_id = static_cast<uint16_t>(word * 64 + bit);
+				set->literal_ids.push_back(literal_id);
+				set->literal_signature |= MatcherStartSet::SignatureBit(literal_id);
 				bits &= bits - 1;
 			}
 		}
