@@ -122,9 +122,7 @@ public:
 		}
 		while (child_index < matcher.matchers.size()) {
 			auto &child_matcher = matcher.matchers[child_index].get();
-			auto current = list_state.token_iterator.Current();
-			bool at_autocomplete_cursor = current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
-			if (!at_autocomplete_cursor) {
+			if (!AtAutocompleteCursor()) {
 				// An optional child that cannot start at this token always produces the same empty result. Answering
 				// that here saves a frame, a match process and a parse result per absent optional, which for the
 				// operator precedence rules is one per level per operand.
@@ -164,6 +162,16 @@ public:
 	}
 
 private:
+	//! Only a stream tokenized for auto-completion has a cursor in it, so the common case is a flag test rather
+	//! than a look at the current token
+	bool AtAutocompleteCursor() {
+		if (!list_state.token_iterator.HasAutocompleteCursor()) {
+			return false;
+		}
+		auto current = list_state.token_iterator.Current();
+		return current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
+	}
+
 	//! For a collapsible rule: the single child that produced a result, provided every other child is an optional
 	//! that matched nothing. Returns nullptr when the list cannot be collapsed.
 	optional_ptr<ParseResult> FindPassthroughResult() const {
@@ -634,7 +642,8 @@ public:
 				results.Add(*child_result->GetParseResult());
 			}
 			state.token_iterator.SetPosition(repeat_state.token_iterator);
-			auto current = repeat_state.token_iterator.Current();
+			auto current = repeat_state.token_iterator.HasAutocompleteCursor() ? repeat_state.token_iterator.Current()
+			                                                                  : nullptr;
 			if (current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
 				matcher.GetChildMatcher().AddSuggestion(state);
 				return MatchStep::Complete(CreateResult());

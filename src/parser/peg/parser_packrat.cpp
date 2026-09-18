@@ -14,7 +14,7 @@ ParserPackratCache::ParserPackratCache(idx_t base_token_index_p, idx_t token_cou
 ParserPackratCache::~ParserPackratCache() = default;
 
 void ParserPackratCache::PackratRow::Grow(idx_t required, idx_t maximum) {
-	auto new_capacity = MaxValue<idx_t>(required, MaxValue<idx_t>(capacity * 4, INITIAL_ROW_CAPACITY));
+	auto new_capacity = MaxValue<idx_t>(required, MaxValue<idx_t>(capacity * 8, INITIAL_ROW_CAPACITY));
 	new_capacity = MinValue<idx_t>(new_capacity, maximum);
 	auto new_entries = make_unsafe_uniq_array_uninitialized<data_t>(new_capacity * sizeof(ParserPackratEntry));
 	auto new_present = make_unsafe_uniq_array<uint8_t>(new_capacity);
