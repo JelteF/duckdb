@@ -30,6 +30,11 @@ public:
 	string ToString() const override {
 		return "EndOfInput";
 	}
+
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		auto current = state.token_iterator.Current();
+		return current && current->type == TokenType::END_OF_INPUT;
+	}
 };
 
 } // namespace duckdb
