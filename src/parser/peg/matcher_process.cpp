@@ -78,6 +78,16 @@ public:
 			auto current = list_state.token_iterator.Current();
 			bool at_autocomplete_cursor = current && current->type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
 			if (!at_autocomplete_cursor) {
+				// An optional child that cannot start at this token always produces the same empty result. Answering
+				// that here saves a frame, a match process and a parse result per absent optional, which for the
+				// operator precedence rules is one per level per operand.
+				if (child_matcher.Type() == MatcherType::OPTIONAL && !child_matcher.MayMatchHere(list_state)) {
+					if (list_state.BuildParseResult()) {
+						results.push_back(*list_state.context.EmptyOptionalResult());
+					}
+					child_index++;
+					continue;
+				}
 				awaiting_child = true;
 				return MatchStep::Child({child_matcher, list_state});
 			}
@@ -235,14 +245,14 @@ public:
 		D_ASSERT(awaiting_child == child_result.has_value());
 		if (!child_result) {
 			if (!matcher.GetChildMatcher().MayMatchHere(child_state)) {
-				return MatchStep::Complete(state.AllocateParseResult<OptionalParseResult>());
+				return MatchStep::Complete(EmptyResult());
 			}
 			awaiting_child = true;
 			return MatchStep::Child({matcher.GetChildMatcher(), child_state});
 		}
 		awaiting_child = false;
 		if (!child_result->IsSuccess()) {
-			return MatchStep::Complete(state.AllocateParseResult<OptionalParseResult>());
+			return MatchStep::Complete(EmptyResult());
 		}
 		state.token_iterator.SetPosition(child_state.token_iterator);
 		if (!child_result->HasParseResult()) {
@@ -250,6 +260,14 @@ public:
 		}
 		return MatchStep::Complete(
 		    state.AllocateParseResult<OptionalParseResult>(child_result->GetParseResult(), start_offset));
+	}
+
+private:
+	MatcherResult EmptyResult() const {
+		if (!state.BuildParseResult()) {
+			return MatcherResult::Success();
+		}
+		return MatcherResult::Success(state.context.EmptyOptionalResult());
 	}
 
 private:

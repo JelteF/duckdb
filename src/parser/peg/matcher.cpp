@@ -56,6 +56,13 @@ void Matcher::Print() const {
 	Printer::Print(ToString());
 }
 
+optional_ptr<ParseResult> MatchContext::EmptyOptionalResult() {
+	if (!empty_optional) {
+		empty_optional = allocator.Make<OptionalParseResult>();
+	}
+	return empty_optional;
+}
+
 void MatchState::AddSuggestion(MatcherSuggestion suggestion) {
 	context.suggestions.push_back(std::move(suggestion));
 }
