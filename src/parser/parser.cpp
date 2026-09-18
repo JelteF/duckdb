@@ -80,7 +80,30 @@ static void ValidateUTF8Query(const string &query) {
 // This function strips unicode space characters from the query and replaces them with regular spaces
 // It returns true if any unicode space characters were found and stripped
 // See here for a list of unicode space characters - https://jkorpela.fi/chars/spaces.html
+//! Whether any byte of the query has its high bit set. A unicode space needs a multi-byte sequence, so a query
+//! that is entirely ASCII - which nearly all are - cannot contain one, and the byte-wise scan below can be skipped.
+static bool QueryHasNonAscii(const char *data, idx_t size) {
+	const uint64_t HIGH_BITS = 0x8080808080808080ULL;
+	idx_t pos = 0;
+	for (; pos + sizeof(uint64_t) <= size; pos += sizeof(uint64_t)) {
+		uint64_t chunk;
+		memcpy(&chunk, data + pos, sizeof(uint64_t));
+		if (chunk & HIGH_BITS) {
+			return true;
+		}
+	}
+	for (; pos < size; pos++) {
+		if (static_cast<unsigned char>(data[pos]) >= 0x80) {
+			return true;
+		}
+	}
+	return false;
+}
+
 bool Parser::StripUnicodeSpaces(const string &query_str, string &new_query) {
+	if (!QueryHasNonAscii(query_str.c_str(), query_str.size())) {
+		return false;
+	}
 	const idx_t NBSP_LEN = 2;
 	const idx_t USP_LEN = 3;
 	idx_t pos = 0;
