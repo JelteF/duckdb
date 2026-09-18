@@ -39,6 +39,8 @@ GeneratedTransformProcess::GeneratedTransformProcess(PEGTransformer &transformer
 
 void GeneratedTransformProcess::ReserveChildSlots(idx_t count) {
 	child_results.resize(count);
+	// a rule pushes at most one child per slot, so the pending list never has to grow either
+	pending_children.reserve(count);
 }
 
 void GeneratedTransformProcess::SetChildResult(idx_t slot, transform_result_ptr result) {

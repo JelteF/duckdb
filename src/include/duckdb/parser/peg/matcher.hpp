@@ -463,7 +463,9 @@ public:
 	optional_ptr<ParseResult> Make(ARGS &&... args) {
 		static_assert(std::is_base_of<ParseResult, RESULT>::value, "Expected a parse result");
 		auto result = arena.Make<RESULT>(std::forward<ARGS>(args)...);
-		parse_results.emplace_back(result);
+		if (RESULT::NEEDS_DESTRUCTOR) {
+			parse_results.emplace_back(result);
+		}
 		return optional_ptr<ParseResult>(result);
 	}
 
