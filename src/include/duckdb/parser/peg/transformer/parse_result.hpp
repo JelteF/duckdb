@@ -147,6 +147,10 @@ inline const char *ParseResultToString(ParseResultType type) {
 
 class ParseResult {
 public:
+	//! Whether the parse result allocator has to keep a pointer to this node to destroy it at the end of the run.
+	//! Most node types only hold spans and pointers into the arena and can be left alone.
+	static constexpr bool NEEDS_DESTRUCTOR = true;
+
 	explicit ParseResult(ParseResultType type, optional_idx offset, optional_idx length = optional_idx())
 	    : type(type), offset(offset), length(length) {
 	}
@@ -253,6 +257,8 @@ struct IdentifierParseResult : ParseResult {
 
 struct EndOfInputParseResult : ParseResult {
 	static constexpr ParseResultType TYPE = ParseResultType::END_OF_INPUT;
+	//! Owns nothing, so the allocator does not have to keep it around to run a destructor
+	static constexpr bool NEEDS_DESTRUCTOR = false;
 
 	EndOfInputParseResult() : ParseResult(TYPE, optional_idx()) {
 	}
@@ -281,6 +287,8 @@ struct KeywordParseResult : ParseResult {
 
 struct ListParseResult : ParseResult {
 	static constexpr ParseResultType TYPE = ParseResultType::LIST;
+	//! Owns nothing, so the allocator does not have to keep it around to run a destructor
+	static constexpr bool NEEDS_DESTRUCTOR = false;
 
 public:
 	explicit ListParseResult(ParseResultChildren results_p, const string *name_p, optional_idx offset)
@@ -337,6 +345,8 @@ private:
 
 struct RepeatParseResult : ParseResult {
 	static constexpr ParseResultType TYPE = ParseResultType::REPEAT;
+	//! Owns nothing, so the allocator does not have to keep it around to run a destructor
+	static constexpr bool NEEDS_DESTRUCTOR = false;
 
 	explicit RepeatParseResult(ParseResultChildren results_p, optional_idx offset)
 	    : ParseResult(TYPE, offset), children(results_p) {
@@ -385,6 +395,8 @@ private:
 
 struct OptionalParseResult : ParseResult {
 	static constexpr ParseResultType TYPE = ParseResultType::OPTIONAL;
+	//! Owns nothing, so the allocator does not have to keep it around to run a destructor
+	static constexpr bool NEEDS_DESTRUCTOR = false;
 
 	explicit OptionalParseResult() : ParseResult(TYPE, optional_idx()), optional_result(nullptr) {
 	}
@@ -429,6 +441,8 @@ private:
 class ChoiceParseResult : public ParseResult {
 public:
 	static constexpr ParseResultType TYPE = ParseResultType::CHOICE;
+	//! Owns nothing, so the allocator does not have to keep it around to run a destructor
+	static constexpr bool NEEDS_DESTRUCTOR = false;
 
 	explicit ChoiceParseResult(ParseResult &parse_result_p, idx_t selected_idx_p, optional_idx offset)
 	    : ParseResult(TYPE, offset), result(parse_result_p), selected_idx(selected_idx_p) {
