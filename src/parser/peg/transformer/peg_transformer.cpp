@@ -229,6 +229,16 @@ transform_result_ptr PEGTransformer::TransformInternal(ParseResult &parse_result
 	return stack.Execute(input);
 }
 
+const CompiledGrammarRule &PEGTransformer::GetRule(const char *rule_name) {
+	auto entry = rule_cache.find(rule_name);
+	if (entry != rule_cache.end()) {
+		return entry->second.get();
+	}
+	auto &rule = GetRule(string(rule_name));
+	rule_cache.emplace(rule_name, rule);
+	return rule;
+}
+
 const CompiledGrammarRule &PEGTransformer::GetRule(const string &rule_name) const {
 	auto rule = grammar.GetRule(rule_name);
 	if (!rule) {
