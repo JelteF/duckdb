@@ -4,6 +4,7 @@
 #include "duckdb/common/optional.hpp"
 #include "duckdb/common/queue.hpp"
 #include "duckdb/parser/peg/matcher/list.hpp"
+#include "duckdb/parser/peg/matcher/precedence_ladder.hpp"
 
 namespace duckdb {
 struct CompiledGrammar;
@@ -42,6 +43,8 @@ public:
 	idx_t PackratMatcherCount() const {
 		return packrat_matcher_count;
 	}
+	//! Index what the start sets say, which is only possible once MatcherAllocator::ComputeStartSets has run
+	void IndexStartSets();
 
 protected:
 	// Base primitives
@@ -63,6 +66,8 @@ protected:
 	void AddPackratMemoizedRule(const char *name);
 	//! Find the chain of collapsible rules that starts at `root_rule` and mark its matchers as ladder levels
 	void BuildPrecedenceLadder(const string &root_rule);
+	//! Mark the rules whose whole body is one ordered choice, which are matched without a list frame
+	void FuseSingleChoiceRules();
 	//! Mark a rule of the form `X <- Y Tail*` (or `Prefix* Y`) whose transformer returns Y's result unchanged when no
 	//! tail matched. When such a rule matches only Y, the matcher hands out Y's parse result directly instead of
 	//! wrapping it, and the transformer runs Y's transform on it. The operator precedence ladder is 16 levels of
@@ -93,6 +98,7 @@ private:
 	string_set_t collapsible_rules;
 	//! Dense ids handed out to memoized matchers, see Matcher::SetPackratMemoized
 	idx_t packrat_matcher_count = 0;
+	vector<reference<PrecedenceLadder>> ladders;
 };
 
 } // namespace duckdb

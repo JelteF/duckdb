@@ -241,13 +241,26 @@ private:
 
 	//! The outermost prefix level that is allowed here and whose prefix can start at the current token
 	idx_t FindPrefixLevel() {
-		for (idx_t level = min_level; level < ladder.levels.size(); level++) {
-			auto &entry = ladder.levels[level];
-			if (entry.IsPrefix() && entry.affix->MayMatchHere(work_state)) {
+		for (auto level : ladder.prefix_levels) {
+			if (level >= min_level && ladder.levels[level].affix->MayMatchHere(work_state)) {
 				return level;
 			}
 		}
 		return ladder.levels.size();
+	}
+
+	//! The suffix levels whose tail could start at the current token
+	uint32_t CandidateLevels() {
+		auto token = work_state.token_iterator.Current();
+		if (!token) {
+			return 0;
+		}
+		auto candidates = ladder.predicate_levels;
+		if (ladder.literal_table) {
+			auto literal_id = work_state.token_iterator.CurrentLiteralInfo(*ladder.literal_table).LiteralId();
+			candidates |= ladder.LiteralLevels(literal_id);
+		}
+		return candidates;
 	}
 
 	MatchStep Start() {
@@ -304,17 +317,21 @@ private:
 
 	//! Walk outwards from the level the value currently sits at, looking for a level whose tail starts here
 	MatchStep Climb() {
-		while (climb_level > min_level) {
-			climb_level--;
-			auto &entry = ladder.levels[climb_level];
-			if (!entry.IsSuffix()) {
+		if (climb_level <= min_level) {
+			return Complete();
+		}
+		auto candidates = CandidateLevels() & PrecedenceLadder::LevelRange(min_level, climb_level);
+		while (candidates) {
+			auto level = idx_t(31 - __builtin_clz(candidates));
+			candidates &= ~(uint32_t(1) << level);
+			// a level the literal table could not answer for still needs its own probe
+			if (((ladder.predicate_levels >> level) & 1) && !ladder.levels[level].affix->MayMatchHere(work_state)) {
 				continue;
 			}
-			if (!entry.affix->MayMatchHere(work_state)) {
-				continue;
-			}
+			climb_level = level;
 			return RequestTail();
 		}
+		climb_level = min_level;
 		return Complete();
 	}
 
@@ -428,20 +445,12 @@ private:
 	Stage stage = Stage::START;
 };
 
-arena_ptr<MatchProcess> ListMatcher::StartMatch(MatchState &state) const {
-	// Auto-completion needs the suggestions that the failing children of the written rules produce, so the ladder is
-	// only taken when the stream has no cursor in it.
-	if (ladder && !state.token_iterator.HasAutocompleteCursor()) {
-		return state.Make<PrecedenceMatchProcess>(*this, state);
-	}
-	return state.Make<ListMatchProcess>(*this, state);
-}
-
 template <bool SINGLE_CHILD>
 class ChoiceMatchProcess : public MatchProcess {
 public:
-	ChoiceMatchProcess(const ChoiceMatcher &matcher_p, MatchState &state_p, idx_t child_index_p = 0)
-	    : matcher(matcher_p), state(state_p), child_index(child_index_p) {
+	ChoiceMatchProcess(const ChoiceMatcher &matcher_p, MatchState &state_p, idx_t child_index_p = 0,
+	                   optional_ptr<const ListMatcher> wrapper_p = nullptr)
+	    : matcher(matcher_p), state(state_p), wrapper(wrapper_p), child_index(child_index_p) {
 		if (auto current = state.token_iterator.Current()) {
 			start_offset = optional_idx(current->offset);
 		}
@@ -455,10 +464,11 @@ public:
 			if (child_result->IsSuccess()) {
 				state.token_iterator.SetPosition(child_state.value().token_iterator);
 				if (!child_result->HasParseResult()) {
-					return MatchStep::Complete(MatcherResult::Success());
+					return MatchStep::Complete(WrapResult(nullptr));
 				}
-				return MatchStep::Complete(state.AllocateParseResult<ChoiceParseResult>(*child_result->GetParseResult(),
-				                                                                        child_index, start_offset));
+				auto choice_result = state.AllocateParseResult<ChoiceParseResult>(*child_result->GetParseResult(),
+				                                                                  child_index, start_offset);
+				return MatchStep::Complete(WrapResult(choice_result.GetParseResult()));
 			}
 			if (SINGLE_CHILD) {
 				return MatchStep::Complete(MatcherResult::Failure());
@@ -480,8 +490,33 @@ public:
 	}
 
 private:
+	//! A rule whose whole body is one ordered choice is matched in this frame rather than in a list frame of its
+	//! own, so the result the list would have built is built here instead.
+	MatcherResult WrapResult(optional_ptr<ParseResult> choice_result) {
+		if (!wrapper) {
+			return MatcherResult::Success(choice_result);
+		}
+		if (!choice_result) {
+			return state.AllocateParseResult<ListParseResult>(ParseResultChildren(), WrapperName(), start_offset);
+		}
+		if (wrapper->IsCollapsible()) {
+			choice_result->collapsed = true;
+			return MatcherResult::Success(choice_result);
+		}
+		reference<ParseResult> children[1] = {*choice_result};
+		auto list_children = state.context.allocator.MakeChildren(children, 1);
+		return state.AllocateParseResult<ListParseResult>(list_children, WrapperName(), start_offset);
+	}
+
+	const string *WrapperName() const {
+		return wrapper->HasName() ? &wrapper->GetNameRef() : nullptr;
+	}
+
+private:
 	const ChoiceMatcher &matcher;
 	MatchState &state;
+	//! Set when this frame stands in for the list frame of a rule whose body is only this choice
+	optional_ptr<const ListMatcher> wrapper;
 	optional<MatchState> child_state;
 	idx_t child_index = 0;
 	optional_idx start_offset;
@@ -492,11 +527,36 @@ arena_ptr<MatchProcess> ChoiceMatcher::StartMatch(MatchState &state) const {
 	return state.Make<ChoiceMatchProcess<false>>(*this, state);
 }
 
-arena_ptr<MatchProcess> LiteralChoiceMatcher::StartMatch(MatchState &state) const {
+arena_ptr<MatchProcess> ListMatcher::StartMatch(MatchState &state) const {
+	// Auto-completion needs the suggestions that the failing children of the written rules produce, so neither the
+	// ladder nor the fused choice is taken when the stream has a cursor in it.
+	if (!state.token_iterator.HasAutocompleteCursor()) {
+		if (ladder) {
+			return state.Make<PrecedenceMatchProcess>(*this, state);
+		}
+		if (fused_choice) {
+			return fused_choice->StartFusedMatch(state, *this);
+		}
+	}
+	return state.Make<ListMatchProcess>(*this, state);
+}
+
+idx_t LiteralChoiceMatcher::DispatchIndex(MatchState &state) const {
 	auto literal = state.token_iterator.CurrentLiteralInfo(table);
 	auto entry = literal_children.find(literal.LiteralId());
-	auto child_index = entry == literal_children.end() ? matchers.size() : entry->second;
-	return state.Make<ChoiceMatchProcess<true>>(*this, state, child_index);
+	return entry == literal_children.end() ? matchers.size() : entry->second;
+}
+
+arena_ptr<MatchProcess> LiteralChoiceMatcher::StartMatch(MatchState &state) const {
+	return state.Make<ChoiceMatchProcess<true>>(*this, state, DispatchIndex(state));
+}
+
+arena_ptr<MatchProcess> LiteralChoiceMatcher::StartFusedMatch(MatchState &state, const ListMatcher &wrapper) const {
+	return state.Make<ChoiceMatchProcess<true>>(*this, state, DispatchIndex(state), wrapper);
+}
+
+arena_ptr<MatchProcess> ChoiceMatcher::StartFusedMatch(MatchState &state, const ListMatcher &wrapper) const {
+	return state.Make<ChoiceMatchProcess<false>>(*this, state, 0, wrapper);
 }
 
 class OptionalMatchProcess : public MatchProcess {
