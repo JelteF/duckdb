@@ -371,12 +371,25 @@ private:
 	vector<unique_ptr<Matcher>> matchers;
 };
 
+//! Owns the parse results of one match run. Results are carved out of an arena instead of being allocated one by
+//! one: a parse creates a result per matched rule and freeing them all at the end is the only lifetime needed.
 class ParseResultAllocator {
 public:
-	optional_ptr<ParseResult> Allocate(unique_ptr<ParseResult> parse_result);
+	ParseResultAllocator();
+	~ParseResultAllocator();
+
+	template <class RESULT, class... ARGS>
+	optional_ptr<ParseResult> Make(ARGS &&... args) {
+		static_assert(std::is_base_of<ParseResult, RESULT>::value, "Expected a parse result");
+		auto result = arena.Make<RESULT>(std::forward<ARGS>(args)...);
+		parse_results.emplace_back(result);
+		return optional_ptr<ParseResult>(result);
+	}
 
 private:
-	vector<unique_ptr<ParseResult>> parse_results;
+	ArenaAllocator arena;
+	//! Only tracked to run the destructors; the memory itself belongs to the arena
+	vector<arena_ptr<ParseResult>> parse_results;
 };
 
 template <class PROCESS, class... ARGS>
@@ -390,7 +403,7 @@ MatcherResult MatchState::AllocateParseResult(ARGS &&... args) {
 	if (!BuildParseResult()) {
 		return MatcherResult::Success();
 	}
-	auto result = context.allocator.Allocate(make_uniq<RESULT>(std::forward<ARGS>(args)...));
+	auto result = context.allocator.Make<RESULT>(std::forward<ARGS>(args)...);
 	if (rule) {
 		result->SetRule(*rule);
 		// List results already carry the matcher name, which SetRule keeps identical to the rule name; skip the
