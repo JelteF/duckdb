@@ -180,8 +180,7 @@ void TokenizerBehavior::PushToken(idx_t start, idx_t end, TokenType type, bool u
 	if (start >= end) {
 		return;
 	}
-	string last_token = sql.substr(start, end - start);
-	tokens.emplace_back(std::move(last_token), start, type, unterminated);
+	tokens.emplace_back(sql.data() + start, end - start, start, type, unterminated);
 	if (tokens.size() < 2) {
 		return;
 	}
