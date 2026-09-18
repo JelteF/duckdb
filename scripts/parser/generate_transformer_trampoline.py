@@ -122,6 +122,30 @@ def finalize_name(rule_name):
     return f"Finalize{rule_name}Trampoline"
 
 
+#: A finalizer that takes the one child result and hands it straight back. The rule builds nothing of its own, so the
+#: matcher can hand out that child instead of the rule's node and skip the transform frame entirely.
+PASSTHROUGH_FINALIZE_BODY = re.compile(
+    r"\{\n\tauto result = process\.TakeResult<(?P<type>.+?)>\(0\);\n"
+    r"\treturn transformer\.MakeResult<(?P=type)>\(std::move\(result\)\);\n\}"
+)
+
+
+def derive_collapsible_rules(source, rule_names):
+    """Rule names whose generated finalizer only forwards their single child."""
+    derived = []
+    for rule_name in rule_names:
+        marker = f"PEGTransformerFactory::{finalize_name(rule_name)}(PEGTransformer &"
+        start = source.find(marker)
+        if start == -1:
+            continue
+        body_start = source.find("{", start + len(marker))
+        if body_start == -1:
+            continue
+        if PASSTHROUGH_FINALIZE_BODY.match(source, body_start):
+            derived.append(rule_name)
+    return derived
+
+
 class ManualTransformRegistry:
     def __init__(self, paths):
         self.signatures = {}
@@ -1593,10 +1617,15 @@ def main():
         additional_result_types = load_additional_transform_result_types(grammar_types_file)
         result_types = generate_transform_result_types(rule_types, additional_result_types)
         write_hpp(emitter.emit_header_declarations(), result_types)
-        write_cpp(emitter.emit_source())
+        source = emitter.emit_source()
+        write_cpp(source)
         write_matcher_rule_overrides(matcher_override_config)
         packrat_rules = load_packrat_memoized_rules(grammar_types_file, all_rules.keys())
         collapsible_rules = load_collapsible_rules(grammar_types_file, all_rules.keys())
+        # the rules that only forward their child are found from the finalizers rather than listed by hand, so the
+        # list cannot drift from the grammar
+        listed = set(collapsible_rules)
+        collapsible_rules += [name for name in derive_collapsible_rules(source, all_rules.keys()) if name not in listed]
         write_matcher_rule_flags(packrat_rules, collapsible_rules)
     elif args.report:
         print(f"grammar files: {', '.join(grammar_files)}")
