@@ -38,6 +38,10 @@ public:
 	Matcher &CreateRootMatcher(const string &root_rule);
 	//! Look up a matcher for a rule that was built by CreateRootMatcher. Throws if the rule has not been built.
 	Matcher &GetMatcher(const string &rule_name);
+	//! Number of memoized matchers created so far
+	idx_t PackratMatcherCount() const {
+		return packrat_matcher_count;
+	}
 
 protected:
 	// Base primitives
@@ -79,6 +83,8 @@ private:
 	case_insensitive_map_t<KeywordInfo> keyword_overrides;
 	string_set_t no_suggestion_rules;
 	string_set_t packrat_memoized_rules;
+	//! Dense ids handed out to memoized matchers, see Matcher::SetPackratMemoized
+	idx_t packrat_matcher_count = 0;
 };
 
 } // namespace duckdb

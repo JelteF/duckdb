@@ -165,6 +165,7 @@ CompiledGrammar::Create(const case_insensitive_map_t<reference<GrammarExtension>
 	auto new_matcher = shared_ptr<CompiledGrammar>(new CompiledGrammar(std::move(allocator), std::move(keyword_helper),
 	                                                                   std::move(tokenizer), std::move(rules),
 	                                                                   program_matcher, top_level_statement_matcher));
+	new_matcher->packrat_matcher_count = factory.PackratMatcherCount();
 	return new_matcher;
 }
 
