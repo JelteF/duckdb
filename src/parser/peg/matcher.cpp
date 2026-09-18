@@ -67,29 +67,7 @@ void MatchState::AddSuggestion(MatcherSuggestion suggestion) {
 	context.suggestions.push_back(std::move(suggestion));
 }
 
-bool Matcher::MayMatchHere(MatchState &state) const {
-	auto token = state.token_iterator.Current();
-	if (!token) {
-		return true;
-	}
-	// never prune at the auto-complete cursor, where the failing children are what produce the suggestions
-	if (state.token_iterator.HasAutocompleteCursor() && token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
-		return true;
-	}
-	if (!start_set) {
-		return CanStartWith(state, 0);
-	}
-	auto &set = *start_set;
-	if (set.any) {
-		return true;
-	}
-	if (!set.literal_ids.empty()) {
-		auto literal_id = state.token_iterator.CurrentLiteralInfo(*set.literal_table).LiteralId();
-		if (literal_id && (set.literal_signature & MatcherStartSet::SignatureBit(literal_id)) &&
-		    std::binary_search(set.literal_ids.begin(), set.literal_ids.end(), literal_id)) {
-			return true;
-		}
-	}
+bool Matcher::MatchesPredicateLeader(MatchState &state, const MatcherStartSet &set) const {
 	for (auto &leader : set.predicate_leaders) {
 		if (leader.get().CanStartWith(state, 0)) {
 			return true;

@@ -37,23 +37,14 @@ optional<MatcherResult> PackratMatchState::TryLoadCachedResult(const Matcher &ma
 	return MatcherResult::Failure();
 }
 
-void PackratMatchState::StoreResult(const Matcher &matcher, MatchState &state, const MatcherResult &result) const {
-	if (!token_index_before.IsValid()) {
-		return;
-	}
+void PackratMatchState::StoreResultInternal(const Matcher &matcher, MatchState &state,
+                                            const MatcherResult &result) const {
 	ParserPackratEntry cache_entry;
 	cache_entry.success = result.IsSuccess();
 	cache_entry.token_index_after = state.token_iterator.Position();
 	cache_entry.max_token_index_seen = MaxValue(max_token_index_before, state.GetMaxTokenIndex());
 	cache_entry.result = result.GetParseResult();
 	state.context.packrat_cache->Store(matcher, token_index_before.GetIndex(), cache_entry);
-}
-
-MatchStackFrame::MatchStackFrame(MatchInput input) : matcher(input.matcher), match_state(input.state) {
-}
-
-bool MatchStackFrame::IsInitialized() const {
-	return process || has_result;
 }
 
 MatcherResult MatchStack::ExecuteAtomicMatcher(MatchInput input) {

@@ -17,6 +17,8 @@
 #include "duckdb/parser/parser_extension.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
 #include "duckdb/parser/token_iterator.hpp"
+
+#include <algorithm>
 #include "duckdb/parser/peg/parser_packrat.hpp"
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
 #include "duckdb/parser/peg/parsed_grammar.hpp"
@@ -323,7 +325,37 @@ public:
 	//! pushing a frame for them. Returns false only when a match is certainly impossible; anything unsure (custom
 	//! matchers, nullable children, deep nesting) answers true. Never prunes at the autocomplete cursor, where the
 	//! failing children are what produce the suggestions.
-	bool MayMatchHere(MatchState &state) const;
+	//! Inline: asked for nearly every child the matcher considers, and answered from the start set without a call
+	bool MayMatchHere(MatchState &state) const {
+		auto token = state.token_iterator.Current();
+		if (!token) {
+			return true;
+		}
+		// never prune at the auto-complete cursor, where the failing children are what produce the suggestions
+		if (state.token_iterator.HasAutocompleteCursor() && token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
+			return true;
+		}
+		auto set = start_set.get();
+		if (!set) {
+			return CanStartWith(state, 0);
+		}
+		if (set->any) {
+			return true;
+		}
+		if (!set->literal_ids.empty()) {
+			auto literal_id = state.token_iterator.CurrentLiteralInfo(*set->literal_table).LiteralId();
+			if (literal_id && (set->literal_signature & MatcherStartSet::SignatureBit(literal_id)) &&
+			    std::binary_search(set->literal_ids.begin(), set->literal_ids.end(), literal_id)) {
+				return true;
+			}
+		}
+		if (set->predicate_leaders.empty()) {
+			return false;
+		}
+		return MatchesPredicateLeader(state, *set);
+	}
+	//! The uncommon half of MayMatchHere: a matcher that identifiers or operators can start
+	bool MatchesPredicateLeader(MatchState &state, const MatcherStartSet &set) const;
 	//! Token predicate for atomic matchers, consulted through the start sets; composite matchers never override it
 	virtual bool CanStartWith(MatchState &state, idx_t depth) const {
 		return true;

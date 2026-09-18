@@ -81,7 +81,13 @@ private:
 public:
 	bool IsSpecialOperator(const string &sql, idx_t pos, idx_t &op_len) const;
 	static bool IsSingleByteOperator(char c);
-	static bool CharacterIsInitialNumber(char c);
+	//! Inline: asked for most characters of the query, where the call costs more than the comparison
+	static bool CharacterIsInitialNumber(char c) {
+		if (c >= '0' && c <= '9') {
+			return true;
+		}
+		return c == '.';
+	}
 	static bool CharacterIsNumber(char c);
 	static bool CharacterIsScientific(char c);
 	static bool CharacterIsControlFlow(char c);

@@ -29,11 +29,6 @@ TokenIterator::TokenIterator(TokenIterator &&other) noexcept
       has_autocomplete_cursor(other.has_autocomplete_cursor) {
 }
 
-bool TokenIterator::AtEnd() const {
-	auto current = Current();
-	return !current || current->type == TokenType::END_OF_INPUT;
-}
-
 bool TokenIterator::HasMoreStatements() const {
 	for (idx_t index = position; index < tokens.size(); index++) {
 		auto type = tokens[index].type;
@@ -45,14 +40,6 @@ bool TokenIterator::HasMoreStatements() const {
 		}
 	}
 	return false;
-}
-
-idx_t TokenIterator::Position() const {
-	return position;
-}
-
-idx_t TokenIterator::Size() const {
-	return tokens.size();
 }
 
 idx_t TokenIterator::EndOffset() const {
@@ -85,18 +72,12 @@ void TokenIterator::Advance(idx_t count) {
 	position += count;
 }
 
-void TokenIterator::SetPosition(idx_t position_p) {
-	if (position_p > tokens.size()) {
-		throw InternalException("Token position %llu is out of range (size %llu)", position_p, tokens.size());
-	}
-	position = position_p;
+void TokenIterator::ThrowPositionOutOfRange(idx_t position_p) const {
+	throw InternalException("Token position %llu is out of range (size %llu)", position_p, tokens.size());
 }
 
-void TokenIterator::SetPosition(const TokenIterator &other) {
-	if (&tokens != &other.tokens) {
-		throw InternalException("Cannot set TokenIterator position from a different token collection");
-	}
-	SetPosition(other.position);
+void TokenIterator::ThrowForeignTokens() const {
+	throw InternalException("Cannot set TokenIterator position from a different token collection");
 }
 
 void TokenIterator::SetPreviousTokenType(TokenType type) {

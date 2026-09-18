@@ -30,11 +30,20 @@ public:
 	TokenIterator &operator=(const TokenIterator &) = delete;
 	TokenIterator &operator=(TokenIterator &&) = delete;
 
-	DUCKDB_API bool AtEnd() const;
 	DUCKDB_API bool HasMoreStatements() const;
-	DUCKDB_API idx_t Position() const;
-	DUCKDB_API idx_t Size() const;
 	DUCKDB_API idx_t EndOffset() const;
+
+	//! Inline: the matcher reads and rewinds the position for every child it tries
+	idx_t Position() const {
+		return position;
+	}
+	idx_t Size() const {
+		return tokens.size();
+	}
+	bool AtEnd() const {
+		auto current = Current();
+		return !current || current->type == TokenType::END_OF_INPUT;
+	}
 
 	//! Inline: this is called on every matcher step, an out-of-line call here is measurable
 	optional_ptr<const MatcherToken> Current() const {
@@ -59,14 +68,27 @@ public:
 	DUCKDB_API const MatcherToken &GetToken(idx_t index) const;
 
 	DUCKDB_API void Advance(idx_t count = 1);
-	DUCKDB_API void SetPosition(idx_t position);
-	DUCKDB_API void SetPosition(const TokenIterator &other);
+	void SetPosition(idx_t position_p) {
+		if (position_p > tokens.size()) {
+			ThrowPositionOutOfRange(position_p);
+		}
+		position = position_p;
+	}
+	void SetPosition(const TokenIterator &other) {
+		if (&tokens != &other.tokens) {
+			ThrowForeignTokens();
+		}
+		SetPosition(other.position);
+	}
 	DUCKDB_API void SetPreviousTokenType(TokenType type);
 
 	DUCKDB_API vector<SimpleToken> RemainingTokens() const;
 	DUCKDB_API string ToString() const;
 
 private:
+	[[noreturn]] DUCKDB_API void ThrowPositionOutOfRange(idx_t position_p) const;
+	[[noreturn]] DUCKDB_API void ThrowForeignTokens() const;
+
 	void InitializeAutocompleteCursor() {
 		has_autocomplete_cursor = !tokens.empty() && tokens.back().type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
 	}
