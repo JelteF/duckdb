@@ -31,6 +31,7 @@ class ParseResultAllocator;
 class Matcher;
 class MatcherAllocator;
 class MatchProcess;
+struct PrecedenceHierarchy;
 
 enum class SuggestionState : uint8_t {
 	SUGGEST_KEYWORD,
@@ -424,12 +425,15 @@ public:
 	Matcher &Allocate(unique_ptr<Matcher> matcher);
 	//! Compute MatcherStartSet for every allocated matcher. Called once the matcher graph of a grammar is complete.
 	void ComputeStartSets(const GrammarLiteralTable &literal_table);
+	//! Take ownership of a precedence hierarchy, which lives as long as the matchers that refer to it
+	PrecedenceHierarchy &AddHierarchy(unique_ptr<PrecedenceHierarchy> hierarchy);
 
 private:
 	vector<unique_ptr<Matcher>> matchers;
 	//! A matcher allocated after the sets were computed would be missing from them, and MayMatchHere would prune
 	//! the branch it is on. Growing a grammar builds a new one, so this only guards an in-place extension.
 	bool start_sets_computed = false;
+	vector<unique_ptr<PrecedenceHierarchy>> hierarchies;
 };
 
 class ParseResultAllocator {

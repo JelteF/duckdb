@@ -1,6 +1,7 @@
 #pragma once
 
 #include "duckdb/parser/peg/matcher.hpp"
+#include "duckdb/parser/peg/matcher/precedence_hierarchy.hpp"
 
 namespace duckdb {
 
@@ -42,10 +43,28 @@ public:
 		return "(" + result + ")";
 	}
 
+
+
+	//! Matched as a level of the operator precedence hierarchy rather than as a plain list. See PrecedenceHierarchy.
+	void SetPrecedenceLevel(const PrecedenceHierarchy &hierarchy_p, idx_t level_p) {
+		hierarchy = hierarchy_p;
+		level = level_p;
+	}
+	optional_ptr<const PrecedenceHierarchy> GetHierarchy() const {
+		return hierarchy;
+	}
+	idx_t GetPrecedenceLevel() const {
+		return level;
+	}
+
 public:
 	vector<reference<Matcher>> matchers;
 	//! If true, this matcher will not contribute autocomplete suggestions (used for rules like ExpressionStatement)
 	bool suppress_suggestions = false;
+
+private:
+	optional_ptr<const PrecedenceHierarchy> hierarchy;
+	idx_t level = 0;
 };
 
 } // namespace duckdb

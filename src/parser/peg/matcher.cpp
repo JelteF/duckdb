@@ -4,6 +4,7 @@
 #include "duckdb/parser/peg/matcher/repeat_matcher.hpp"
 #include "duckdb/parser/peg/matcher/optional_matcher.hpp"
 #include "duckdb/parser/peg/matcher/list_matcher.hpp"
+#include "duckdb/parser/peg/matcher/precedence_hierarchy.hpp"
 #include "duckdb/parser/peg/matcher/choice_matcher.hpp"
 #include "duckdb/parser/peg/matcher/keyword_matcher.hpp"
 #include "duckdb/parser/peg/matcher_stack.hpp"
@@ -262,6 +263,12 @@ void MatcherAllocator::ComputeStartSets(const GrammarLiteralTable &literal_table
 		matcher->start_set = builder.Take(*matcher);
 	}
 	start_sets_computed = true;
+}
+
+PrecedenceHierarchy &MatcherAllocator::AddHierarchy(unique_ptr<PrecedenceHierarchy> hierarchy) {
+	auto &result = *hierarchy;
+	hierarchies.push_back(std::move(hierarchy));
+	return result;
 }
 
 Matcher &MatcherAllocator::Allocate(unique_ptr<Matcher> matcher) {

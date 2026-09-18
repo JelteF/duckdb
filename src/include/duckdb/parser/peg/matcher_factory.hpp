@@ -57,6 +57,8 @@ protected:
 	void AddKeywordOverride(const char *name, KeywordInfo keyword_info);
 	void AddRuleOverride(const char *name, unique_ptr<Matcher> &&matcher_p);
 	void AddPackratMemoizedRule(const char *name);
+	//! Find the chain of collapsible rules that starts at `root_rule` and mark its matchers as hierarchy levels
+	void BuildPrecedenceHierarchy(const string &root_rule);
 	//! Mark a rule whose transformer hands back one child's result unchanged, such as a level of the operator
 	//! precedence hierarchy that matched no tail. When that child is the only one with a parse result, the matcher
 	//! hands it out instead of wrapping it and the transformer runs the child's own transform.

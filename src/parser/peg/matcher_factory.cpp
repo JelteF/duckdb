@@ -3,6 +3,9 @@
 #include "duckdb/parser/peg/matcher/list.hpp"
 #include "duckdb/parser/peg/compiled_grammar.hpp"
 #include "duckdb/parser/peg/matcher/literal_choice_matcher.hpp"
+#include "duckdb/parser/peg/matcher/optional_matcher.hpp"
+#include "duckdb/parser/peg/matcher/precedence_hierarchy.hpp"
+#include "duckdb/parser/peg/matcher/repeat_matcher.hpp"
 
 namespace duckdb {
 
@@ -19,6 +22,55 @@ public:
 		return optional_idx(literal_info.LiteralId());
 	}
 };
+
+namespace {
+
+//! A collapsible rule of the form `X <- Y`, `X <- Y Tail*`, `X <- Y Tail?` or `X <- Prefix? Y` is a link of the
+//! operator precedence hierarchy: its own contribution is a single optional affix and it forwards its operand
+//! otherwise. Returns false when the matcher has another shape, which ends the chain.
+bool DescribeHierarchyLevel(ListMatcher &matcher, PrecedenceLevel &level) {
+	if (!matcher.IsCollapsible() || !matcher.GetRule()) {
+		return false;
+	}
+	auto &children = matcher.matchers;
+	if (children.size() == 1) {
+		// a rule whose body is one ordered choice forwards a chosen alternative rather than an operand, so it is
+		// not a level: the chain ends here and the choice is parsed as the leaf
+		if (children[0].get().Type() == MatcherType::CHOICE) {
+			return false;
+		}
+		level.shape = PrecedenceShape::ALIAS;
+		level.operand = children[0].get();
+		return true;
+	}
+	if (children.size() != 2) {
+		return false;
+	}
+	auto &first = children[0].get();
+	auto &second = children[1].get();
+	if (first.Type() != MatcherType::OPTIONAL && second.Type() == MatcherType::OPTIONAL) {
+		auto &affix = second.Cast<OptionalMatcher>().GetChildMatcher();
+		// `Tail*` is an optional around a repeat, `Tail?` an optional around the tail itself
+		if (affix.Type() == MatcherType::REPEAT) {
+			level.shape = PrecedenceShape::SUFFIX_REPEAT;
+			level.affix = affix.Cast<RepeatMatcher>().GetChildMatcher();
+		} else {
+			level.shape = PrecedenceShape::SUFFIX_OPTIONAL;
+			level.affix = affix;
+		}
+		level.operand = first;
+		return true;
+	}
+	if (first.Type() == MatcherType::OPTIONAL && second.Type() != MatcherType::OPTIONAL) {
+		level.shape = PrecedenceShape::PREFIX_OPTIONAL;
+		level.affix = first.Cast<OptionalMatcher>().GetChildMatcher();
+		level.operand = second;
+		return true;
+	}
+	return false;
+}
+
+} // namespace
 
 void MatcherFactory::MatcherConstructionState::Register(string_t rule_name) {
 	unconstructed.insert(rule_name);
@@ -214,6 +266,38 @@ MatcherFactory::MatcherFactory(MatcherAllocator &allocator, const ParsedGrammar 
       terminal_rule_overrides(std::move(terminal_rule_overrides_p)) {
 }
 
+void MatcherFactory::BuildPrecedenceHierarchy(const string &root_rule) {
+	auto entry = matchers.find(root_rule);
+	if (entry == matchers.end() || entry->second.get().Type() != MatcherType::LIST) {
+		return;
+	}
+	auto hierarchy = make_uniq<PrecedenceHierarchy>();
+	vector<reference<ListMatcher>> chain;
+	auto current = optional_ptr<ListMatcher>(&entry->second.get().Cast<ListMatcher>());
+	while (current) {
+		PrecedenceLevel level;
+		if (!DescribeHierarchyLevel(*current, level)) {
+			break;
+		}
+		level.rule = current->GetRule();
+		hierarchy->levels.push_back(level);
+		chain.push_back(*current);
+		auto &operand = *level.operand;
+		current = operand.Type() == MatcherType::LIST ? optional_ptr<ListMatcher>(&operand.Cast<ListMatcher>())
+		                                              : optional_ptr<ListMatcher>();
+	}
+	if (hierarchy->levels.size() < 2) {
+		return;
+	}
+	hierarchy->leaf = hierarchy->levels.back().operand;
+
+	auto &stored = allocator.AddHierarchy(std::move(hierarchy));
+	for (idx_t level = 0; level < chain.size(); level++) {
+		chain[level].get().SetPrecedenceLevel(stored, level);
+	}
+}
+
+
 Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	// keyword overrides
 	AddKeywordOverride("TABLE", KeywordInfo(1, ' '));
@@ -301,6 +385,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	while (construction_state.HasScheduled()) {
 		CreateMatcher(construction_state.TakeNext());
 	}
+	BuildPrecedenceHierarchy("Expression");
 	return GetMatcher(root_rule);
 }
 

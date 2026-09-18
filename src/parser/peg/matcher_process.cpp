@@ -165,7 +165,241 @@ private:
 	bool awaiting_child = false;
 };
 
+//! Matches a level of the operator precedence hierarchy. See PrecedenceHierarchy for what the levels are.
+//!
+//! The operand is parsed once, by the rule the chain ends at, and the levels are then walked outwards: a level whose
+//! tail does not start here is skipped, one whose tail matches builds the node the written rule would have built.
+//! A skipped level is the case the collapse in ListMatchProcess handles, so the operand's result is handed back
+//! marked collapsed.
+class PrecedenceMatchProcess : public MatchProcess {
+public:
+	PrecedenceMatchProcess(const ListMatcher &matcher_p, MatchState &state_p)
+	    : hierarchy(*matcher_p.GetHierarchy()), min_level(matcher_p.GetPrecedenceLevel()), state(state_p),
+	      work_state(state_p), attempt_state(state_p), tails(state_p.context.process_allocator) {
+		if (auto current = work_state.token_iterator.Current()) {
+			start_offset = optional_idx(current->offset);
+		}
+	}
+
+	MatchStep Resume(optional<MatcherResult> child_result) override {
+		auto result = child_result ? &child_result.value() : nullptr;
+		switch (stage) {
+		case Stage::START:
+			return Start();
+		case Stage::AWAIT_PREFIX:
+			return PrefixMatched(result);
+		case Stage::AWAIT_PREFIX_OPERAND:
+			return PrefixOperandMatched(result);
+		case Stage::AWAIT_LEAF:
+			return LeafMatched(result);
+		case Stage::AWAIT_TAIL:
+			return TailMatched(result);
+		default:
+			throw InternalException("Unexpected state in the precedence hierarchy matcher");
+		}
+	}
+
+private:
+	enum class Stage : uint8_t { START, AWAIT_PREFIX, AWAIT_PREFIX_OPERAND, AWAIT_LEAF, AWAIT_TAIL };
+
+	//! The outermost prefix level that is allowed here and whose prefix can start at the current token
+	idx_t FindPrefixLevel() {
+		for (idx_t level = min_level; level < hierarchy.levels.size(); level++) {
+			auto &entry = hierarchy.levels[level];
+			if (entry.IsPrefix() && entry.affix->MayMatchHere(work_state)) {
+				return level;
+			}
+		}
+		return hierarchy.levels.size();
+	}
+
+	MatchStep Start() {
+		auto prefix_level = FindPrefixLevel();
+		if (prefix_level < hierarchy.levels.size()) {
+			pending_level = prefix_level;
+			stage = Stage::AWAIT_PREFIX;
+			attempt_state.token_iterator.SetPosition(work_state.token_iterator);
+			return MatchStep::Child({*hierarchy.levels[prefix_level].affix, attempt_state});
+		}
+		stage = Stage::AWAIT_LEAF;
+		return MatchStep::Child({*hierarchy.leaf, work_state});
+	}
+
+	MatchStep PrefixMatched(const MatcherResult *child_result) {
+		D_ASSERT(child_result);
+		if (!child_result->IsSuccess()) {
+			// the start set only promised the prefix might match; without it this is an ordinary operand
+			stage = Stage::AWAIT_LEAF;
+			return MatchStep::Child({*hierarchy.leaf, work_state});
+		}
+		prefix_result = child_result->GetParseResult();
+		work_state.token_iterator.SetPosition(attempt_state.token_iterator);
+		stage = Stage::AWAIT_PREFIX_OPERAND;
+		return MatchStep::Child({OperandMatcher(pending_level), work_state});
+	}
+
+	MatchStep PrefixOperandMatched(const MatcherResult *child_result) {
+		D_ASSERT(child_result);
+		if (!child_result->IsSuccess()) {
+			return MatchStep::Complete(MatcherResult::Failure());
+		}
+		value = child_result->GetParseResult();
+		if (BuildsResults() && value) {
+			auto &entry = hierarchy.levels[pending_level];
+			auto prefix_optional = MakeOptional(prefix_result, start_offset);
+			value = MakeNode(entry, *prefix_optional, *value);
+		}
+		value_level = pending_level;
+		climb_level = pending_level;
+		return Climb();
+	}
+
+	MatchStep LeafMatched(const MatcherResult *child_result) {
+		D_ASSERT(child_result);
+		if (!child_result->IsSuccess()) {
+			return MatchStep::Complete(MatcherResult::Failure());
+		}
+		value = child_result->GetParseResult();
+		value_level = hierarchy.LeafLevel();
+		climb_level = value_level;
+		return Climb();
+	}
+
+	//! Walk outwards from the level the value currently sits at, looking for a level whose tail starts here
+	MatchStep Climb() {
+		while (climb_level > min_level) {
+			climb_level--;
+			auto &entry = hierarchy.levels[climb_level];
+			if (!entry.IsSuffix()) {
+				continue;
+			}
+			if (!entry.affix->MayMatchHere(work_state)) {
+				continue;
+			}
+			return RequestTail();
+		}
+		return Complete();
+	}
+
+	MatchStep RequestTail() {
+		pending_level = climb_level;
+		stage = Stage::AWAIT_TAIL;
+		attempt_state.token_iterator.SetPosition(work_state.token_iterator);
+		if (auto current = work_state.token_iterator.Current()) {
+			tail_offset = optional_idx(current->offset);
+		}
+		return MatchStep::Child({*hierarchy.levels[climb_level].affix, attempt_state});
+	}
+
+	MatchStep TailMatched(const MatcherResult *child_result) {
+		D_ASSERT(child_result);
+		auto &entry = hierarchy.levels[pending_level];
+		if (child_result->IsSuccess()) {
+			work_state.token_iterator.SetPosition(attempt_state.token_iterator);
+			if (BuildsResults() && child_result->HasParseResult()) {
+				tails.push_back(*child_result->GetParseResult());
+			}
+			if (entry.shape == PrecedenceShape::SUFFIX_REPEAT && entry.affix->MayMatchHere(work_state)) {
+				return RequestTail();
+			}
+		}
+		if (!tails.empty()) {
+			value = MakeSuffixNode(entry);
+			value_level = pending_level;
+		}
+		tails.clear();
+		return Climb();
+	}
+
+	MatchStep Complete() {
+		state.token_iterator.SetPosition(work_state.token_iterator);
+		if (!BuildsResults()) {
+			return MatchStep::Complete(MatcherResult::Success());
+		}
+		// every level between the one the value sits at and this one matched nothing but their operand
+		MarkCollapsed(min_level);
+		return MatchStep::Complete(MatcherResult::Success(value));
+	}
+
+private:
+	bool BuildsResults() const {
+		return state.BuildParseResult();
+	}
+
+	//! A level that matched nothing but its operand hands out the operand's result in place of its own, which the
+	//! transformer recognises by the collapsed flag. Set it when levels were skipped between `level` and the value.
+	void MarkCollapsed(idx_t level) {
+		if (value && value_level != level) {
+			value->collapsed = true;
+		}
+	}
+
+	const Matcher &OperandMatcher(idx_t level) const {
+		return *hierarchy.levels[level].operand;
+	}
+
+	optional_ptr<ParseResult> MakeOptional(optional_ptr<ParseResult> child, optional_idx offset) {
+		if (!child) {
+			return state.context.EmptyOptionalResult();
+		}
+		return state.context.allocator.Make<OptionalParseResult>(child, offset);
+	}
+
+	//! Build the node the written rule would have built for this level
+	optional_ptr<ParseResult> MakeNode(const PrecedenceLevel &entry, ParseResult &first, ParseResult &second) {
+		arena_vector<reference<ParseResult>> children(state.context.process_allocator);
+		children.push_back(first);
+		children.push_back(second);
+		auto list_children = state.context.allocator.MakeChildren(children);
+		auto result = state.context.allocator.Make<ListParseResult>(list_children, nullptr, start_offset);
+		result->SetRule(*entry.rule);
+		result->SetNameFrom(*entry.rule);
+		return result;
+	}
+
+	optional_ptr<ParseResult> MakeSuffixNode(const PrecedenceLevel &entry) {
+		if (!BuildsResults()) {
+			return value;
+		}
+		// the operand of this level is the next level down; anything deeper collapsed on the way here
+		MarkCollapsed(pending_level + 1);
+		optional_ptr<ParseResult> affix_result;
+		if (entry.shape == PrecedenceShape::SUFFIX_REPEAT) {
+			auto repeat_children = state.context.allocator.MakeChildren(tails);
+			affix_result = state.context.allocator.Make<RepeatParseResult>(repeat_children, tail_offset);
+		} else {
+			D_ASSERT(tails.size() == 1);
+			affix_result = tails[0].get();
+		}
+		auto optional_result = MakeOptional(affix_result, tail_offset);
+		return MakeNode(entry, *value, *optional_result);
+	}
+
+private:
+	const PrecedenceHierarchy &hierarchy;
+	idx_t min_level;
+	MatchState &state;
+	//! The position everything matched so far has advanced to
+	MatchState work_state;
+	//! Used for a tail or prefix that may fail, which must not move the committed position
+	MatchState attempt_state;
+	arena_vector<reference<ParseResult>> tails;
+	optional_ptr<ParseResult> value;
+	optional_ptr<ParseResult> prefix_result;
+	idx_t value_level = 0;
+	idx_t climb_level = 0;
+	idx_t pending_level = 0;
+	optional_idx start_offset;
+	optional_idx tail_offset;
+	Stage stage = Stage::START;
+};
+
 arena_ptr<MatchProcess> ListMatcher::StartMatch(MatchState &state) const {
+	// Auto-completion needs the suggestions that the failing children of the written rules produce, so neither the
+	// hierarchy nor the fused choice is taken when the stream has a cursor in it.
+	if (hierarchy && !state.token_iterator.HasAutocompleteCursor()) {
+		return state.Make<PrecedenceMatchProcess>(*this, state);
+	}
 	return state.Make<ListMatchProcess>(*this, state);
 }
 

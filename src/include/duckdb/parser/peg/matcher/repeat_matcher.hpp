@@ -25,6 +25,9 @@ public:
 	const Matcher &GetChildMatcher() const {
 		return element;
 	}
+	Matcher &GetChildMatcher() {
+		return element;
+	}
 
 private:
 	Matcher &element;
