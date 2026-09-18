@@ -1826,21 +1826,12 @@ collapsible_rules:
   - PrefixExpression
   - BaseExpression
 
+# The levels of the operator precedence ladder are deliberately not here: they form a chain that is
+# entered once per operand position rather than a rule several ordered choices re-enter at the same
+# token, so memoizing them cost a lookup and a store per level per operand for a hit rate of two in
+# a thousand. Expression stays: it is the entry point those ordered choices re-enter.
 packrat_memoized_rules:
   - Expression
-  - LambdaArrowExpression
-  - LogicalOrExpression
-  - LogicalAndExpression
-  - LogicalNotExpression
-  - IsExpression
-  - ComparisonExpression
-  - BitwiseExpression
-  - AdditiveExpression
-  - MultiplicativeExpression
-  - ExponentiationExpression
-  - PrefixExpression
-  - CollateExpression
-  - AtTimeZoneExpression
   - SingleExpression
   - BaseExpression
   - ParensExpression
