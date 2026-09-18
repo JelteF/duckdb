@@ -12,6 +12,7 @@ from grammar_types import (
     load_additional_transform_result_types,
     load_grammar_types,
     load_matcher_rule_overrides,
+    load_collapsible_rules,
     load_packrat_memoized_rules,
 )
 from transformer_trampoline_config import (
@@ -93,6 +94,8 @@ MATCHER_START_BLOCK = SEPARATOR + "\t// START GENERATED RULE OVERRIDES\n" + SEPA
 MATCHER_END_BLOCK = SEPARATOR + "\t// END GENERATED RULE OVERRIDES\n" + SEPARATOR
 PACKRAT_START_BLOCK = SEPARATOR + "\t// START GENERATED PACKRAT MEMOIZED RULES\n" + SEPARATOR
 PACKRAT_END_BLOCK = SEPARATOR + "\t// END GENERATED PACKRAT MEMOIZED RULES\n" + SEPARATOR
+COLLAPSIBLE_START_BLOCK = SEPARATOR + "\t// START GENERATED COLLAPSIBLE RULES\n" + SEPARATOR
+COLLAPSIBLE_END_BLOCK = SEPARATOR + "\t// END GENERATED COLLAPSIBLE RULES\n" + SEPARATOR
 RESULT_TYPE_SEPARATOR = "//===--------------------------------------------------------------------===//\n"
 RESULT_TYPE_START_BLOCK = RESULT_TYPE_SEPARATOR + "// START GENERATED TRANSFORM RESULT TYPES\n" + RESULT_TYPE_SEPARATOR
 RESULT_TYPE_END_BLOCK = RESULT_TYPE_SEPARATOR + "// END GENERATED TRANSFORM RESULT TYPES\n" + RESULT_TYPE_SEPARATOR
@@ -278,6 +281,8 @@ class UseGramPreviewEmitter:
         self.excluded_rules = excluded_rules
         self.matcher_overrides = matcher_overrides
         self.rule_config = rule_config
+        # rules whose finalizer only hands back its single child, recorded while emitting them
+        self.forwarding_rules = []
         self.syntax_only_rules = self.collect_syntax_only_rules()
         self.rule_capabilities = self.collect_rule_capabilities()
 
@@ -835,6 +840,10 @@ class UseGramPreviewEmitter:
         cpp_type = self.cpp_type(rule_name)
         by_value = self.by_value(rule_name)
         slot_expr = self.adjusted_slot_expr(plan, child_arg.slot_idx)
+        # sequence_forward_child only picks a child when it is the rule's only one that carries a value, and this
+        # body hands that child's result straight back. A match where it is also the only child with a parse result
+        # therefore transforms to what transforming the child on its own gives, so the matcher can hand it out.
+        self.forwarding_rules.append(rule_name)
         return [
             f"\tauto result = process.TakeResult<{cpp_type}>({slot_expr});",
             f"\treturn {typed_result_expr(cpp_type, 'result', by_value)};",
@@ -1006,6 +1015,10 @@ class UseGramPreviewEmitter:
             lines.append("\t}")
         else:
             lines.append(f"\tauto result = process.TakeResult<{cpp_type}>(0);")
+            # nothing above this branch emitted anything, so the finalizer is only "take the chosen alternative's
+            # result and hand it back". Transforming that alternative on its own gives the same value, so the
+            # matcher can hand it out in place of this rule's own result.
+            self.forwarding_rules.append(rule_name)
         lines.append(f"\treturn {typed_result_expr(cpp_type, 'result', by_value)};")
         lines.append("}")
         return lines
@@ -1544,6 +1557,20 @@ def write_packrat_memoized_rules(packrat_memoized_rules):
     print(f"Updated {matcher_cpp_path}")
 
 
+def write_collapsible_rules(collapsible_rules):
+    content = matcher_cpp_path.read_text()
+    lines = [f'\tAddCollapsibleRule("{rule_name}");\n' for rule_name in collapsible_rules]
+    content = replace_generated_block(
+        content,
+        COLLAPSIBLE_START_BLOCK,
+        COLLAPSIBLE_END_BLOCK,
+        "".join(lines),
+        matcher_cpp_path,
+    )
+    matcher_cpp_path.write_text(content)
+    print(f"Updated {matcher_cpp_path}")
+
+
 def generate_transform_result_types(rule_types, additional_result_types):
     result_types = sorted({info.cpp_type for info in rule_types.values()}.union(additional_result_types))
     lines = []
@@ -1591,7 +1618,11 @@ def main():
         write_cpp(emitter.emit_source())
         write_matcher_rule_overrides(matcher_override_config)
         packrat_rules = load_packrat_memoized_rules(grammar_types_file, all_rules.keys())
+        collapsible_rules = load_collapsible_rules(grammar_types_file, all_rules.keys())
+        listed = set(collapsible_rules)
+        collapsible_rules += [name for name in dict.fromkeys(emitter.forwarding_rules) if name not in listed]
         write_packrat_memoized_rules(packrat_rules)
+        write_collapsible_rules(collapsible_rules)
     elif args.report:
         print(f"grammar files: {', '.join(grammar_files)}")
         print(emitter.emit_report())

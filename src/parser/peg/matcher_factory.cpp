@@ -166,6 +166,9 @@ Matcher &MatcherFactory::CreateMatcher(string_t rule_name, vector<reference<Matc
 	if (packrat_memoized_rules.count(rule_name)) {
 		matcher.SetPackratMemoized();
 	}
+	if (collapsible_rules.count(rule_name)) {
+		matcher.SetCollapsible();
+	}
 	if (no_suggestion_rules.count(rule_name)) {
 		matcher.Cast<ListMatcher>().suppress_suggestions = true;
 	}
@@ -196,6 +199,10 @@ void MatcherFactory::AddPackratMemoizedRule(const char *name) {
 	packrat_memoized_rules.insert(name);
 }
 
+void MatcherFactory::AddCollapsibleRule(const char *name) {
+	collapsible_rules.insert(name);
+}
+
 void MatcherFactory::SuppressSuggestions(const char *name) {
 	no_suggestion_rules.insert(name);
 }
@@ -224,6 +231,209 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddPackratMemoizedRule("ReservedSchemaQualification");
 	//===--------------------------------------------------------------------===//
 	// END GENERATED PACKRAT MEMOIZED RULES
+	//===--------------------------------------------------------------------===//
+
+	// collapsible rules
+	//===--------------------------------------------------------------------===//
+	// START GENERATED COLLAPSIBLE RULES
+	//===--------------------------------------------------------------------===//
+	AddCollapsibleRule("LambdaArrowExpression");
+	AddCollapsibleRule("LogicalOrExpression");
+	AddCollapsibleRule("LogicalAndExpression");
+	AddCollapsibleRule("LogicalNotExpression");
+	AddCollapsibleRule("IsExpression");
+	AddCollapsibleRule("IsDistinctFromExpression");
+	AddCollapsibleRule("ComparisonExpression");
+	AddCollapsibleRule("BetweenInLikeExpression");
+	AddCollapsibleRule("OtherOperatorExpression");
+	AddCollapsibleRule("BitwiseExpression");
+	AddCollapsibleRule("AdditiveExpression");
+	AddCollapsibleRule("MultiplicativeExpression");
+	AddCollapsibleRule("ExponentiationExpression");
+	AddCollapsibleRule("CollateExpression");
+	AddCollapsibleRule("AtTimeZoneExpression");
+	AddCollapsibleRule("PrefixExpression");
+	AddCollapsibleRule("BaseExpression");
+	AddCollapsibleRule("SelectSetOpChain");
+	AddCollapsibleRule("IntersectChain");
+	AddCollapsibleRule("AlterOptions");
+	AddCollapsibleRule("AlterTableOptions");
+	AddCollapsibleRule("AlterColumnEntry");
+	AddCollapsibleRule("AddOrDropDefault");
+	AddCollapsibleRule("AlterSequenceOptions");
+	AddCollapsibleRule("CommentTarget");
+	AddCollapsibleRule("CommentOnType");
+	AddCollapsibleRule("CommentValue");
+	AddCollapsibleRule("ExpressionAlias");
+	AddCollapsibleRule("TypeVariations");
+	AddCollapsibleRule("SimpleType");
+	AddCollapsibleRule("IntervalType");
+	AddCollapsibleRule("IntervalInterval");
+	AddCollapsibleRule("IntervalWithSpecifier");
+	AddCollapsibleRule("Interval");
+	AddCollapsibleRule("IntervalToInterval");
+	AddCollapsibleRule("NumericType");
+	AddCollapsibleRule("DecimalNumericType");
+	AddCollapsibleRule("QualifiedTypeName");
+	AddCollapsibleRule("ArrayBounds");
+	AddCollapsibleRule("TimeOrTimestamp");
+	AddCollapsibleRule("WithOrWithout");
+	AddCollapsibleRule("SessionTarget");
+	AddCollapsibleRule("CopyVariations");
+	AddCollapsibleRule("FromOrTo");
+	AddCollapsibleRule("CopyFileName");
+	AddCollapsibleRule("CopyFileNameExpression");
+	AddCollapsibleRule("CopyFileNameSuffix");
+	AddCollapsibleRule("CopyOptionList");
+	AddCollapsibleRule("SpecializedOption");
+	AddCollapsibleRule("SingleOption");
+	AddCollapsibleRule("PartitionByColumnList");
+	AddCollapsibleRule("CopyGenericOption");
+	AddCollapsibleRule("GenericCopyOptionValue");
+	AddCollapsibleRule("CopyFromDatabase");
+	AddCollapsibleRule("SchemaOrData");
+	AddCollapsibleRule("RelOptionOrOids");
+	AddCollapsibleRule("WithOrWithoutOids");
+	AddCollapsibleRule("DefArg");
+	AddCollapsibleRule("MacroOrFunction");
+	AddCollapsibleRule("MacroDefinitionBody");
+	AddCollapsibleRule("MacroParameter");
+	AddCollapsibleRule("SequenceOption");
+	AddCollapsibleRule("SeqSetCycle");
+	AddCollapsibleRule("CreateStatementVariation");
+	AddCollapsibleRule("Temporary");
+	AddCollapsibleRule("CreateTableDefinition");
+	AddCollapsibleRule("PartitionSortedOptions");
+	AddCollapsibleRule("WithData");
+	AddCollapsibleRule("QualifiedName");
+	AddCollapsibleRule("CreateTableColumnElement");
+	AddCollapsibleRule("ColumnConstraint");
+	AddCollapsibleRule("TopLevelConstraintList");
+	AddCollapsibleRule("GeneratedColumnType");
+	AddCollapsibleRule("PreserveOrDelete");
+	AddCollapsibleRule("TriggerBody");
+	AddCollapsibleRule("ReferencingItem");
+	AddCollapsibleRule("TriggerTiming");
+	AddCollapsibleRule("TriggerEvent");
+	AddCollapsibleRule("ForEachClause");
+	AddCollapsibleRule("CreateType");
+	AddCollapsibleRule("DescribeOrSummarize");
+	AddCollapsibleRule("DescribeTarget");
+	AddCollapsibleRule("ShowOrDescribe");
+	AddCollapsibleRule("DescribeRule");
+	AddCollapsibleRule("DropEntries");
+	AddCollapsibleRule("QualifiedIndexName");
+	AddCollapsibleRule("TableOrView");
+	AddCollapsibleRule("FunctionTypeMacro");
+	AddCollapsibleRule("DropBehavior");
+	AddCollapsibleRule("ExplainableStatements");
+	AddCollapsibleRule("FunctionIdentifier");
+	AddCollapsibleRule("DistinctOrAll");
+	AddCollapsibleRule("IgnoreOrRespectNulls");
+	AddCollapsibleRule("CastOrTryCast");
+	AddCollapsibleRule("ExcludeNames");
+	AddCollapsibleRule("ExcludeName");
+	AddCollapsibleRule("ReplaceEntries");
+	AddCollapsibleRule("RenameEntries");
+	AddCollapsibleRule("IntervalParameter");
+	AddCollapsibleRule("FrameExtent");
+	AddCollapsibleRule("FrameBound");
+	AddCollapsibleRule("PrecedingOrFollowing");
+	AddCollapsibleRule("WindowExcludeElement");
+	AddCollapsibleRule("WindowFrame");
+	AddCollapsibleRule("WindowFrameDefinition");
+	AddCollapsibleRule("ListExpression");
+	AddCollapsibleRule("GroupingOrGroupingId");
+	AddCollapsibleRule("Parameter");
+	AddCollapsibleRule("SingleExpression");
+	AddCollapsibleRule("Expression");
+	AddCollapsibleRule("IsTest");
+	AddCollapsibleRule("IsLiteralValue");
+	AddCollapsibleRule("NotNull");
+	AddCollapsibleRule("ComparisonOperator");
+	AddCollapsibleRule("BetweenInLikeOpExpression");
+	AddCollapsibleRule("InExpression");
+	AddCollapsibleRule("OtherOperator");
+	AddCollapsibleRule("AnyOrAll");
+	AddCollapsibleRule("Indirection");
+	AddCollapsibleRule("DotOperator");
+	AddCollapsibleRule("EndSliceValue");
+	AddCollapsibleRule("SpecialFunctionExpression");
+	AddCollapsibleRule("SubstringArguments");
+	AddCollapsibleRule("SubstringFromFor");
+	AddCollapsibleRule("OverlayArguments");
+	AddCollapsibleRule("ExtractArgument");
+	AddCollapsibleRule("ExtractDatePart");
+	AddCollapsibleRule("ExternalResourceStatement");
+	AddCollapsibleRule("ExternalResourceCreationOptions");
+	AddCollapsibleRule("ExternalResourceSource");
+	AddCollapsibleRule("OrAction");
+	AddCollapsibleRule("ByNameOrPosition");
+	AddCollapsibleRule("InsertByNameOrder");
+	AddCollapsibleRule("InsertByPositionOrder");
+	AddCollapsibleRule("InsertValues");
+	AddCollapsibleRule("OnConflictTarget");
+	AddCollapsibleRule("OnConflictAction");
+	AddCollapsibleRule("FromSource");
+	AddCollapsibleRule("ExtensionRepositoryStatement");
+	AddCollapsibleRule("MergeMatch");
+	AddCollapsibleRule("MatchedClauseAction");
+	AddCollapsibleRule("UpdateMatchInfo");
+	AddCollapsibleRule("InsertMatchInfo");
+	AddCollapsibleRule("UpdateMatchSetClause");
+	AddCollapsibleRule("BySourceOrTarget");
+	AddCollapsibleRule("PivotColumnEntry");
+	AddCollapsibleRule("OptionalParensNameList");
+	AddCollapsibleRule("IncludeOrExcludeNulls");
+	AddCollapsibleRule("UnpivotHeader");
+	AddCollapsibleRule("PragmaAssignOrFunction");
+	AddCollapsibleRule("SelectAtom");
+	AddCollapsibleRule("SetopType");
+	AddCollapsibleRule("SelectStatementType");
+	AddCollapsibleRule("LimitOffset");
+	AddCollapsibleRule("OptionalParensSimpleSelect");
+	AddCollapsibleRule("SelectFrom");
+	AddCollapsibleRule("CTEBody");
+	AddCollapsibleRule("DistinctClause");
+	AddCollapsibleRule("InnerTableRef");
+	AddCollapsibleRule("JoinOrPivot");
+	AddCollapsibleRule("PivotValueTarget");
+	AddCollapsibleRule("BaseTableName");
+	AddCollapsibleRule("QualifiedTableName");
+	AddCollapsibleRule("TableFunction");
+	AddCollapsibleRule("FunctionArgument");
+	AddCollapsibleRule("TableAlias");
+	AddCollapsibleRule("JoinClause");
+	AddCollapsibleRule("NearestJoinClause");
+	AddCollapsibleRule("NearestBareTableRef");
+	AddCollapsibleRule("ApproxOrExact");
+	AddCollapsibleRule("DistanceOrSimilarity");
+	AddCollapsibleRule("JoinQualifier");
+	AddCollapsibleRule("JoinType");
+	AddCollapsibleRule("JoinPrefix");
+	AddCollapsibleRule("SampleEntry");
+	AddCollapsibleRule("SampleValue");
+	AddCollapsibleRule("SampleUnit");
+	AddCollapsibleRule("GroupByExpressions");
+	AddCollapsibleRule("GroupByExpression");
+	AddCollapsibleRule("DescOrAsc");
+	AddCollapsibleRule("NullsFirstOrLast");
+	AddCollapsibleRule("OrderByExpressions");
+	AddCollapsibleRule("LimitValue");
+	AddCollapsibleRule("FetchClause");
+	AddCollapsibleRule("AliasedExpression");
+	AddCollapsibleRule("SetAssignmentOrTimeZone");
+	AddCollapsibleRule("SetVariableOrSetting");
+	AddCollapsibleRule("ZoneValue");
+	AddCollapsibleRule("SettingScope");
+	AddCollapsibleRule("TransactionStatement");
+	AddCollapsibleRule("ReadOnlyOrReadWrite");
+	AddCollapsibleRule("UpdateTarget");
+	AddCollapsibleRule("UpdateSetClause");
+	AddCollapsibleRule("UseTarget");
+	AddCollapsibleRule("VacuumOptions");
+	//===--------------------------------------------------------------------===//
+	// END GENERATED COLLAPSIBLE RULES
 	//===--------------------------------------------------------------------===//
 
 	for (auto &entry : terminal_rule_overrides) {
