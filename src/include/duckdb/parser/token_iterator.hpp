@@ -33,7 +33,13 @@ public:
 	DUCKDB_API idx_t Size() const;
 	DUCKDB_API idx_t EndOffset() const;
 
-	DUCKDB_API optional_ptr<const MatcherToken> Current() const;
+	//! Inline: this is called on every matcher step, an out-of-line call here is measurable
+	optional_ptr<const MatcherToken> Current() const {
+		if (position >= tokens.size()) {
+			return nullptr;
+		}
+		return tokens[position];
+	}
 	LiteralInfo CurrentLiteralInfo(const GrammarLiteralTable &table) {
 		if (position >= tokens.size()) {
 			return LiteralInfo();
