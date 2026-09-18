@@ -60,6 +60,13 @@ public:
 	bool CanStartWith(MatchState &state, idx_t depth) const override {
 		return KeywordMatches(state);
 	}
+	//! The keyword's id in the grammar's literal table, or 0 when it is matched by text comparison instead
+	uint16_t LiteralId() const {
+		return literal_table ? literal_info.LiteralId() : 0;
+	}
+	optional_ptr<const GrammarLiteralTable> GetLiteralTable() const {
+		return literal_table;
+	}
 
 private:
 	bool KeywordMatches(MatchState &state) const {

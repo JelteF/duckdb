@@ -1,4 +1,11 @@
 #include "duckdb/parser/peg/matcher.hpp"
+
+#include <algorithm>
+#include "duckdb/parser/peg/matcher/repeat_matcher.hpp"
+#include "duckdb/parser/peg/matcher/optional_matcher.hpp"
+#include "duckdb/parser/peg/matcher/list_matcher.hpp"
+#include "duckdb/parser/peg/matcher/choice_matcher.hpp"
+#include "duckdb/parser/peg/matcher/keyword_matcher.hpp"
 #include "duckdb/parser/peg/matcher_stack.hpp"
 #include "duckdb/parser/peg/compiled_grammar.hpp"
 #include "duckdb/parser/peg/matcher_factory.hpp"
@@ -57,7 +64,181 @@ bool Matcher::MayMatchHere(MatchState &state) const {
 	if (!token || token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
 		return true;
 	}
-	return CanStartWith(state, 0);
+	if (!start_set) {
+		return CanStartWith(state, 0);
+	}
+	auto &set = *start_set;
+	if (set.any) {
+		return true;
+	}
+	if (!set.literal_ids.empty()) {
+		auto literal_id = state.token_iterator.CurrentLiteralInfo(*set.literal_table).LiteralId();
+		if (literal_id && std::binary_search(set.literal_ids.begin(), set.literal_ids.end(), literal_id)) {
+			return true;
+		}
+	}
+	for (auto &leader : set.predicate_leaders) {
+		if (leader.get().CanStartWith(state, 0)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+namespace {
+
+//! Computes MatcherStartSet for a matcher graph. Rule references make the graph cyclic; a matcher reached again while
+//! its own set is still being computed contributes "anything", which is conservative.
+class StartSetBuilder {
+public:
+	struct Entry {
+		unique_ptr<MatcherStartSet> set;
+		//! Literal ids as a bitmap while building, so that merging up the graph is a word-wise OR rather than a
+		//! sort of ever larger id lists; converted to the sorted list in Finalize
+		vector<uint64_t> literal_bits;
+		bool nullable = false;
+		bool in_progress = false;
+	};
+
+	Entry &Compute(const Matcher &matcher) {
+		auto &entry = entries[&matcher];
+		if (entry.set) {
+			return entry;
+		}
+		if (entry.in_progress) {
+			return cycle_entry;
+		}
+		entry.in_progress = true;
+		auto set = make_uniq<MatcherStartSet>();
+		bool nullable = false;
+		switch (matcher.Type()) {
+		case MatcherType::KEYWORD: {
+			auto &keyword = matcher.Cast<KeywordMatcher>();
+			if (keyword.LiteralId()) {
+				set->literal_table = keyword.GetLiteralTable();
+				SetBit(entry.literal_bits, keyword.LiteralId());
+			} else {
+				set->predicate_leaders.push_back(matcher);
+			}
+			break;
+		}
+		case MatcherType::CHOICE:
+			for (auto &child : matcher.Cast<ChoiceMatcher>().matchers) {
+				auto &child_entry = Compute(child.get());
+				Merge(*set, entry, child_entry);
+				nullable = nullable || child_entry.nullable;
+			}
+			break;
+		case MatcherType::LIST: {
+			nullable = true;
+			for (auto &child : matcher.Cast<ListMatcher>().matchers) {
+				auto &child_entry = Compute(child.get());
+				Merge(*set, entry, child_entry);
+				if (!child_entry.nullable) {
+					nullable = false;
+					break;
+				}
+			}
+			break;
+		}
+		case MatcherType::OPTIONAL:
+			Merge(*set, entry, Compute(matcher.Cast<OptionalMatcher>().GetChildMatcher()));
+			nullable = true;
+			break;
+		case MatcherType::REPEAT: {
+			auto &child_entry = Compute(matcher.Cast<RepeatMatcher>().GetChildMatcher());
+			Merge(*set, entry, child_entry);
+			nullable = child_entry.nullable;
+			break;
+		}
+		case MatcherType::VARIABLE:
+		case MatcherType::OPERATOR:
+			// identifier and operator matchers implement CanStartWith
+			set->predicate_leaders.push_back(matcher);
+			break;
+		default:
+			set->any = true;
+			break;
+		}
+		for (idx_t word = 0; word < entry.literal_bits.size(); word++) {
+			auto bits = entry.literal_bits[word];
+			while (bits) {
+				auto bit = static_cast<idx_t>(__builtin_ctzll(bits));
+				set->literal_ids.push_back(static_cast<uint16_t>(word * 64 + bit));
+				bits &= bits - 1;
+			}
+		}
+		entry.set = std::move(set);
+		entry.nullable = nullable;
+		entry.in_progress = false;
+		return entry;
+	}
+
+	unique_ptr<MatcherStartSet> Take(const Matcher &matcher, bool &nullable) {
+		auto &entry = Compute(matcher);
+		nullable = entry.nullable;
+		return std::move(entry.set);
+	}
+
+private:
+	static void SetBit(vector<uint64_t> &bits, uint16_t literal_id) {
+		idx_t word = literal_id / 64;
+		if (word >= bits.size()) {
+			bits.resize(word + 1, 0);
+		}
+		bits[word] |= uint64_t(1) << (literal_id % 64);
+	}
+
+	static void Merge(MatcherStartSet &target, Entry &target_entry, const Entry &source) {
+		auto &set = *source.set;
+		if (set.any) {
+			target.any = true;
+		}
+		if (!source.literal_bits.empty()) {
+			target.literal_table = set.literal_table;
+			if (target_entry.literal_bits.size() < source.literal_bits.size()) {
+				target_entry.literal_bits.resize(source.literal_bits.size(), 0);
+			}
+			for (idx_t word = 0; word < source.literal_bits.size(); word++) {
+				target_entry.literal_bits[word] |= source.literal_bits[word];
+			}
+		}
+		for (auto &leader : set.predicate_leaders) {
+			bool present = false;
+			for (auto &existing : target.predicate_leaders) {
+				if (&existing.get() == &leader.get()) {
+					present = true;
+					break;
+				}
+			}
+			if (!present) {
+				target.predicate_leaders.push_back(leader);
+			}
+		}
+	}
+
+	StartSetBuilder() {
+		cycle_entry.set = make_uniq<MatcherStartSet>();
+		cycle_entry.set->any = true;
+	}
+	friend class duckdb::MatcherAllocator;
+
+	unordered_map<const Matcher *, Entry> entries;
+	Entry cycle_entry;
+};
+
+} // namespace
+
+void MatcherAllocator::ComputeStartSets() {
+	StartSetBuilder builder;
+	// compute everything first: Take moves the set out, and a matcher's set must stay available while the matchers
+	// that reference it are still being computed
+	for (auto &matcher : matchers) {
+		builder.Compute(*matcher);
+	}
+	for (auto &matcher : matchers) {
+		matcher->start_set = builder.Take(*matcher, matcher->nullable);
+	}
 }
 
 Matcher &MatcherAllocator::Allocate(unique_ptr<Matcher> matcher) {
