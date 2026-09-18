@@ -261,6 +261,63 @@ MatcherFactory::MatcherFactory(MatcherAllocator &allocator, const ParsedGrammar 
       terminal_rule_overrides(std::move(terminal_rule_overrides_p)) {
 }
 
+//! Index the levels by the tokens their affix can start with, so that walking the ladder outwards costs one lookup
+//! instead of a start set probe per level.
+static void BuildLadderLevelMasks(PrecedenceLadder &ladder) {
+	for (idx_t level = 0; level < ladder.levels.size(); level++) {
+		auto &entry = ladder.levels[level];
+		if (!entry.affix) {
+			continue;
+		}
+		if (entry.IsPrefix()) {
+			ladder.prefix_levels.push_back(level);
+			continue;
+		}
+		auto level_bit = uint32_t(1) << level;
+		auto start_set = entry.affix->GetStartSet();
+		if (!start_set || start_set->any || !start_set->predicate_leaders.empty()) {
+			ladder.predicate_levels |= level_bit;
+		}
+		if (!start_set) {
+			continue;
+		}
+		if (start_set->literal_table) {
+			ladder.literal_table = start_set->literal_table;
+		}
+		for (auto literal_id : start_set->literal_ids) {
+			if (literal_id >= ladder.literal_levels.size()) {
+				ladder.literal_levels.resize(literal_id + 1, 0);
+			}
+			ladder.literal_levels[literal_id] |= level_bit;
+		}
+	}
+}
+
+void MatcherFactory::IndexStartSets() {
+	for (auto &ladder : ladders) {
+		BuildLadderLevelMasks(ladder.get());
+	}
+}
+
+void MatcherFactory::FuseSingleChoiceRules() {
+	for (auto &entry : matchers) {
+		auto &matcher = entry.second.get();
+		if (matcher.Type() != MatcherType::LIST) {
+			continue;
+		}
+		auto &list = matcher.Cast<ListMatcher>();
+		// a rule that is only an ordered choice does not need a frame of its own to wrap the choice's result
+		if (list.suppress_suggestions || list.GetLadder() || list.matchers.size() != 1) {
+			continue;
+		}
+		auto &child = list.matchers[0].get();
+		if (child.Type() != MatcherType::CHOICE) {
+			continue;
+		}
+		list.SetFusedChoice(child.Cast<ChoiceMatcher>());
+	}
+}
+
 void MatcherFactory::BuildPrecedenceLadder(const string &root_rule) {
 	auto entry = matchers.find(root_rule);
 	if (entry == matchers.end() || entry->second.get().Type() != MatcherType::LIST) {
@@ -281,12 +338,13 @@ void MatcherFactory::BuildPrecedenceLadder(const string &root_rule) {
 		current = operand.Type() == MatcherType::LIST ? optional_ptr<ListMatcher>(&operand.Cast<ListMatcher>())
 		                                              : optional_ptr<ListMatcher>();
 	}
-	if (ladder->levels.size() < 2) {
+	if (ladder->levels.size() < 2 || ladder->levels.size() > PrecedenceLadder::MAX_LEVELS) {
 		return;
 	}
 	ladder->leaf = ladder->levels.back().operand;
 
 	auto &stored = allocator.AddLadder(std::move(ladder));
+	ladders.push_back(stored);
 	for (idx_t level = 0; level < chain.size(); level++) {
 		chain[level].get().SetPrecedenceLevel(stored, level);
 	}
@@ -384,6 +442,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 		CreateMatcher(construction_state.TakeNext());
 	}
 	BuildPrecedenceLadder("Expression");
+	FuseSingleChoiceRules();
 	return GetMatcher(root_rule);
 }
 
