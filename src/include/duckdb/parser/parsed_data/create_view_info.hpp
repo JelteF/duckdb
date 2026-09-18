@@ -15,6 +15,7 @@
 #include "duckdb/common/identifier.hpp"
 namespace duckdb {
 class SchemaCatalogEntry;
+class Parser;
 
 enum class CreateViewBindingMode { BIND_ON_CREATE, SKIP_BINDING };
 
@@ -57,11 +58,17 @@ public:
 	                                                            const string &sql);
 	//! Parse a SELECT statement from a SQL string
 	DUCKDB_API static unique_ptr<SelectStatement> ParseSelect(const string &sql);
+	//! Parse the SELECT with the parser options of the given context, so that the context's cached compiled grammar
+	//! is reused rather than compiling the grammar from scratch for this one statement
+	DUCKDB_API static unique_ptr<SelectStatement> ParseSelect(ClientContext &context, const string &sql);
 
 	DUCKDB_API void Serialize(Serializer &serializer) const override;
 	DUCKDB_API static unique_ptr<CreateInfo> Deserialize(Deserializer &deserializer);
 
 	string ToString() const override;
+
+private:
+	static unique_ptr<SelectStatement> ParseSelect(Parser &parser, const string &sql);
 
 private:
 	CreateViewInfo(vector<Identifier> names, vector<Value> comments, identifier_map_t<Value> column_comments);
