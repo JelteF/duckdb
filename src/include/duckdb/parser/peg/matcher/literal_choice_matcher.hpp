@@ -12,10 +12,6 @@ public:
 	}
 
 	arena_ptr<MatchProcess> StartMatch(MatchState &state) const override;
-	bool CanStartWith(MatchState &state, idx_t depth) const override {
-		auto literal = state.token_iterator.CurrentLiteralInfo(table);
-		return literal_children.find(literal.LiteralId()) != literal_children.end();
-	}
 
 private:
 	const GrammarLiteralTable &table;
