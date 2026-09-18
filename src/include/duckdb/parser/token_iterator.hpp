@@ -42,6 +42,10 @@ public:
 		}
 		return tokens[position];
 	}
+	//! True when the stream was tokenized for auto-completion, which puts the cursor token at the end
+	bool HasAutocompleteCursor() const {
+		return !tokens.empty() && tokens.back().type == TokenType::END_OF_INPUT_AUTOCOMPLETE;
+	}
 	LiteralInfo CurrentLiteralInfo(const GrammarLiteralTable &table) {
 		if (position >= tokens.size()) {
 			return LiteralInfo();

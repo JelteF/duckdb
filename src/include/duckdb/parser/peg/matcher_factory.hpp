@@ -61,6 +61,8 @@ protected:
 	void AddKeywordOverride(const char *name, KeywordInfo keyword_info);
 	void AddRuleOverride(const char *name, unique_ptr<Matcher> &&matcher_p);
 	void AddPackratMemoizedRule(const char *name);
+	//! Find the chain of collapsible rules that starts at `root_rule` and mark its matchers as ladder levels
+	void BuildPrecedenceLadder(const string &root_rule);
 	//! Mark a rule of the form `X <- Y Tail*` (or `Prefix* Y`) whose transformer returns Y's result unchanged when no
 	//! tail matched. When such a rule matches only Y, the matcher hands out Y's parse result directly instead of
 	//! wrapping it, and the transformer runs Y's transform on it. The operator precedence ladder is 16 levels of

@@ -4,6 +4,7 @@
 #include "duckdb/parser/peg/matcher/repeat_matcher.hpp"
 #include "duckdb/parser/peg/matcher/optional_matcher.hpp"
 #include "duckdb/parser/peg/matcher/list_matcher.hpp"
+#include "duckdb/parser/peg/matcher/precedence_ladder.hpp"
 #include "duckdb/parser/peg/matcher/choice_matcher.hpp"
 #include "duckdb/parser/peg/matcher/keyword_matcher.hpp"
 #include "duckdb/parser/peg/matcher_stack.hpp"
@@ -246,6 +247,12 @@ void MatcherAllocator::ComputeStartSets() {
 	for (auto &matcher : matchers) {
 		matcher->start_set = builder.Take(*matcher, matcher->nullable);
 	}
+}
+
+PrecedenceLadder &MatcherAllocator::AddLadder(unique_ptr<PrecedenceLadder> ladder) {
+	auto &result = *ladder;
+	ladders.push_back(std::move(ladder));
+	return result;
 }
 
 Matcher &MatcherAllocator::Allocate(unique_ptr<Matcher> matcher) {
