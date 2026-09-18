@@ -1840,6 +1840,7 @@ packrat_memoized_rules:
   - ColId
   - ColumnReference
   - FunctionExpression
+  - Expression
 
 # ---------------------------------------------------------------------------
 # excluded_rules: no transformer stub generated, no semantic value extracted

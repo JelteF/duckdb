@@ -495,6 +495,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddPackratMemoizedRule("ColId");
 	AddPackratMemoizedRule("ColumnReference");
 	AddPackratMemoizedRule("FunctionExpression");
+	AddPackratMemoizedRule("Expression");
 	//===--------------------------------------------------------------------===//
 	// END GENERATED MATCHER RULE FLAGS
 	//===--------------------------------------------------------------------===//
