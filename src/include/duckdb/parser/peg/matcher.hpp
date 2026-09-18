@@ -323,6 +323,10 @@ public:
 		return !name.empty();
 	}
 	string GetName() const;
+	//! The stored name, which lives as long as the grammar and can therefore be referenced by a parse result
+	const string &GetNameRef() const {
+		return name;
+	}
 	optional_idx GetPackratId() const {
 		return packrat_id;
 	}
@@ -424,6 +428,19 @@ public:
 		return optional_ptr<ParseResult>(result);
 	}
 
+	//! Copy a collected set of children into the arena, where it lives as long as the results it belongs to
+	ParseResultChildren MakeChildren(const reference<ParseResult> *children, idx_t count) {
+		if (count == 0) {
+			return ParseResultChildren();
+		}
+		arena.AlignNext();
+		auto target = reinterpret_cast<reference<ParseResult> *>(
+		    arena.Allocate(count * sizeof(reference<ParseResult>)));
+		memcpy(static_cast<void *>(target), static_cast<const void *>(children),
+		       count * sizeof(reference<ParseResult>));
+		return ParseResultChildren(target, count);
+	}
+
 private:
 	ArenaAllocator arena;
 	//! Only tracked to run the destructors; the memory itself belongs to the arena
@@ -444,10 +461,8 @@ MatcherResult MatchState::AllocateParseResult(ARGS &&... args) {
 	auto result = context.allocator.Make<RESULT>(std::forward<ARGS>(args)...);
 	if (rule) {
 		result->SetRule(*rule);
-		// List results already carry the matcher name, which SetRule keeps identical to the rule name; skip the
-		// second string copy in that case
-		if (result->name.empty()) {
-			result->name = rule->name;
+		if (!result->HasName()) {
+			result->SetName(rule->name);
 		}
 	}
 	return MatcherResult::Success(result);
