@@ -61,6 +61,9 @@ public:
 	//! Tokenize the behavior's input and return whether autocomplete can be offered.
 	virtual bool TokenizeInput(TokenizerBehavior &behavior) const;
 
+	//! Used to size the token vector up front
+	static constexpr idx_t AVERAGE_TOKEN_LENGTH = 4;
+
 protected:
 	virtual bool BackslashEscapesStringLiterals() const;
 	virtual bool IsQuotedIdentifierDelimiter(char character) const;

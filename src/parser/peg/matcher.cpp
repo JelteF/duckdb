@@ -69,7 +69,11 @@ void MatchState::AddSuggestion(MatcherSuggestion suggestion) {
 
 bool Matcher::MayMatchHere(MatchState &state) const {
 	auto token = state.token_iterator.Current();
-	if (!token || token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
+	if (!token) {
+		return true;
+	}
+	// never prune at the auto-complete cursor, where the failing children are what produce the suggestions
+	if (state.token_iterator.HasAutocompleteCursor() && token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
 		return true;
 	}
 	if (!start_set) {
