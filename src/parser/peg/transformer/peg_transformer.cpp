@@ -100,6 +100,10 @@ TransformStep FinalizeTransformProcess::Resume(transform_result_ptr child_result
 
 arena_ptr<TransformProcess> CompiledGrammarRule::StartTransform(PEGTransformer &transformer,
                                                                 ParseResult &parse_result) const {
+	if (generated_ops) {
+		return transformer.MakeProcess<GeneratedTransformProcess>(transformer, TransformInput {parse_result},
+		                                                          *generated_ops);
+	}
 	if (!transform_process) {
 		throw NotImplementedException("No transform process found for rule '%s'", parse_result.Name());
 	}
@@ -148,8 +152,30 @@ transform_result_ptr TransformStack::ExecuteFrame(TransformStackFrame &frame) {
 	if (!child) {
 		return step.TakeResult();
 	}
+	if (auto child_result = TryTransformWithoutFrame(*child)) {
+		frame.child_result = std::move(child_result);
+		return nullptr;
+	}
 	PushFrame(*child);
 	return nullptr;
+}
+
+//! A rule whose transformer never asks for a child is finished in one step, so it is run here instead of being given
+//! a frame and a process of its own. Its process lives on the stack, which is the whole point: for the rules that only
+//! build a literal it is the frame around them, not the transformer, that costs.
+transform_result_ptr TransformStack::TryTransformWithoutFrame(TransformInput input) {
+	auto rule = input.GetRule();
+	if (!rule || !rule->IsChildlessTransform()) {
+		return nullptr;
+	}
+	GeneratedTransformProcess process(transformer, input, *rule->generated_ops);
+	auto step = process.Resume(nullptr);
+	if (step.GetChild()) {
+		throw InternalException("Transformer for rule '%s' asked for a child after being marked childless", rule->name);
+	}
+	auto result = step.TakeResult();
+	transformer.SetResultLocation(input.parse_result, *result);
+	return result;
 }
 
 transform_result_ptr TransformStack::Execute(TransformInput input) {

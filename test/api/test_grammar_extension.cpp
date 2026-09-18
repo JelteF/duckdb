@@ -32,7 +32,8 @@ static compiled_rules_map_t CompileTestProgramRule(const ParsedGrammar &grammar)
 	if (!rule) {
 		throw InternalException("Test grammar is missing the Program rule");
 	}
-	rules.emplace(rule->name, make_uniq<CompiledGrammarRule>(rule->name, rule->transform_process));
+	rules.emplace(rule->name, make_uniq<CompiledGrammarRule>(rule->name, rule->transform_process, rule->generated_ops,
+	                                                         rule->childless_transform));
 	return rules;
 }
 
