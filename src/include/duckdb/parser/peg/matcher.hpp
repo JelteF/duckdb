@@ -276,8 +276,15 @@ struct MatcherStartSet {
 	optional_ptr<const GrammarLiteralTable> literal_table;
 	//! Sorted literal ids of the keywords that can start the matcher
 	vector<uint16_t> literal_ids;
+	//! `literal_ids` folded into 64 buckets. A literal whose bucket is clear is certainly not in the set, which
+	//! answers the common case - the token is not one this matcher starts with - without searching the list.
+	uint64_t literal_signature = 0;
 	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
 	vector<reference<const Matcher>> predicate_leaders;
+
+	static uint64_t SignatureBit(uint16_t literal_id) {
+		return uint64_t(1) << (literal_id & 63);
+	}
 };
 
 class Matcher {
