@@ -61,6 +61,37 @@ inline string TokenTypeToString(TokenType type) {
 }
 
 class PEGTransformer; // Forward declaration
+class ParseResult;
+
+//! Non-owning view over the children of a list or repeat parse result. The children are carved out of the parse
+//! result arena, so the view stays valid exactly as long as the results themselves.
+class ParseResultChildren {
+public:
+	ParseResultChildren() = default;
+	ParseResultChildren(reference<ParseResult> *children, idx_t count) : children(children), count(count) {
+	}
+
+	idx_t size() const { // NOLINT: match stl case
+		return count;
+	}
+	bool empty() const { // NOLINT: match stl case
+		return count == 0;
+	}
+	reference<ParseResult> *begin() const { // NOLINT: match stl case
+		return children;
+	}
+	reference<ParseResult> *end() const { // NOLINT: match stl case
+		return children + count;
+	}
+	reference<ParseResult> &operator[](idx_t index) const {
+		return children[index];
+	}
+
+private:
+	reference<ParseResult> *children = nullptr;
+	idx_t count = 0;
+};
+
 struct CompiledGrammarRule;
 
 enum class ParseResultType : uint8_t {
@@ -128,13 +159,12 @@ public:
 	TARGET &Cast() {
 		if (TARGET::TYPE != ParseResultType::INVALID && type != TARGET::TYPE) {
 			throw InternalException("Failed to cast parse result of type %s to type %s for rule %s",
-			                        ParseResultToString(TARGET::TYPE), ParseResultToString(type), name);
+			                        ParseResultToString(TARGET::TYPE), ParseResultToString(type), Name());
 		}
 		return reinterpret_cast<TARGET &>(*this);
 	}
 
 	ParseResultType type;
-	string name;
 	optional_ptr<const CompiledGrammarRule> rule;
 	//! Set when a collapsible rule (see MatcherFactory::AddCollapsibleRule) handed out this child result in place of
 	//! its own. The transformer then runs this result's own rule even if the parent asked for the collapsed rule.
@@ -145,6 +175,22 @@ public:
 
 	void SetRule(const CompiledGrammarRule &rule_p) {
 		rule = rule_p;
+	}
+
+	//! The name of the rule (or matcher) that produced this result. Rule names live in the compiled grammar and
+	//! outlive every parse, so a result points at one instead of owning a copy of it.
+	const string &Name() const {
+		static const string EMPTY;
+		return name ? *name : EMPTY;
+	}
+	bool HasName() const {
+		return name && !name->empty();
+	}
+	void SetName(const string &name_p) {
+		name = &name_p;
+	}
+	void SetNameFrom(const ParseResult &other) {
+		name = other.name;
 	}
 	optional_ptr<const CompiledGrammarRule> GetRule() const {
 		return rule;
@@ -172,8 +218,8 @@ public:
 	virtual void ToStringInternal(std::stringstream &ss, std::unordered_set<const ParseResult *> &visited,
 	                              const std::string &indent, bool is_last) const {
 		ss << indent << (is_last ? "└─" : "├─") << " " << ParseResultToString(type);
-		if (!name.empty()) {
-			ss << " (" << name << ")";
+		if (HasName()) {
+			ss << " (" << Name() << ")";
 		}
 	}
 
@@ -185,6 +231,9 @@ public:
 		ToStringInternal(ss, visited, "", true);
 		return ss.str();
 	}
+
+private:
+	const string *name = nullptr;
 };
 
 struct IdentifierParseResult : ParseResult {
@@ -234,15 +283,17 @@ struct ListParseResult : ParseResult {
 	static constexpr ParseResultType TYPE = ParseResultType::LIST;
 
 public:
-	explicit ListParseResult(vector<reference<ParseResult>> results_p, string name_p, optional_idx offset)
-	    : ParseResult(TYPE, offset), children(std::move(results_p)) {
-		name = std::move(name_p);
+	explicit ListParseResult(ParseResultChildren results_p, const string *name_p, optional_idx offset)
+	    : ParseResult(TYPE, offset), children(results_p) {
+		if (name_p) {
+			SetName(*name_p);
+		}
 		for (auto &child : children) {
 			EncloseChild(child.get());
 		}
 	}
 
-	vector<reference<ParseResult>> GetChildren() const {
+	ParseResultChildren GetChildren() const {
 		return children;
 	}
 
@@ -263,14 +314,14 @@ public:
 		ss << indent << (is_last ? "└─" : "├─");
 
 		if (visited.count(this)) {
-			ss << " List (" << name << ") [... already printed ...]\n";
+			ss << " List (" << Name() << ") [... already printed ...]\n";
 			return;
 		}
 		visited.insert(this);
 
 		ss << " " << ParseResultToString(type);
-		if (!name.empty()) {
-			ss << " (" << name << ")";
+		if (HasName()) {
+			ss << " (" << Name() << ")";
 		}
 		ss << " [" << children.size() << " children]\n";
 
@@ -281,20 +332,20 @@ public:
 	}
 
 private:
-	vector<reference<ParseResult>> children;
+	ParseResultChildren children;
 };
 
 struct RepeatParseResult : ParseResult {
 	static constexpr ParseResultType TYPE = ParseResultType::REPEAT;
 
-	explicit RepeatParseResult(vector<reference<ParseResult>> results_p, optional_idx offset)
-	    : ParseResult(TYPE, offset), children(std::move(results_p)) {
+	explicit RepeatParseResult(ParseResultChildren results_p, optional_idx offset)
+	    : ParseResult(TYPE, offset), children(results_p) {
 		for (auto &child : children) {
 			EncloseChild(child.get());
 		}
 	}
 
-	vector<reference<ParseResult>> GetChildren() const {
+	ParseResultChildren GetChildren() const {
 		return children;
 	}
 
@@ -311,14 +362,14 @@ struct RepeatParseResult : ParseResult {
 		ss << indent << (is_last ? "└─" : "├─");
 
 		if (visited.count(this)) {
-			ss << " Repeat (" << name << ") [... already printed ...]\n";
+			ss << " Repeat (" << Name() << ") [... already printed ...]\n";
 			return;
 		}
 		visited.insert(this);
 
 		ss << " " << ParseResultToString(type);
-		if (!name.empty()) {
-			ss << " (" << name << ")";
+		if (HasName()) {
+			ss << " (" << Name() << ")";
 		}
 		ss << " [" << children.size() << " children]\n";
 
@@ -329,7 +380,7 @@ struct RepeatParseResult : ParseResult {
 	}
 
 private:
-	vector<reference<ParseResult>> children;
+	ParseResultChildren children;
 };
 
 struct OptionalParseResult : ParseResult {
@@ -339,7 +390,7 @@ struct OptionalParseResult : ParseResult {
 	}
 	explicit OptionalParseResult(optional_ptr<ParseResult> result_p, optional_idx offset)
 	    : ParseResult(TYPE, offset), optional_result(result_p) {
-		name = result_p->name;
+		SetNameFrom(*result_p);
 		EncloseChild(*result_p);
 	}
 
@@ -381,7 +432,7 @@ public:
 
 	explicit ChoiceParseResult(ParseResult &parse_result_p, idx_t selected_idx_p, optional_idx offset)
 	    : ParseResult(TYPE, offset), result(parse_result_p), selected_idx(selected_idx_p) {
-		name = parse_result_p.name;
+		SetNameFrom(parse_result_p);
 		EncloseChild(parse_result_p);
 	}
 
