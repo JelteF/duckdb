@@ -9,6 +9,7 @@
 #pragma once
 
 #include "duckdb/common/allocator.hpp"
+#include "duckdb/common/helper.hpp"
 #include "duckdb/common/common.hpp"
 #include "duckdb/common/types/string.hpp"
 #include "duckdb/common/arena_containers/arena_ptr.hpp"
@@ -47,11 +48,20 @@ public:
 	}
 	DUCKDB_API data_ptr_t Reallocate(data_ptr_t pointer, idx_t old_size, idx_t size);
 
-	DUCKDB_API data_ptr_t AllocateAligned(idx_t size);
+	//! Inline: the parser makes tens of thousands of these per statement, where the call costs more than the bump
+	data_ptr_t AllocateAligned(idx_t size) {
+		AlignNext();
+		return Allocate(AlignValue<idx_t>(size));
+	}
 	DUCKDB_API data_ptr_t ReallocateAligned(data_ptr_t pointer, idx_t old_size, idx_t size);
 
 	//! Increment the internal cursor (if required) so the next allocation is guaranteed to be aligned to 8 bytes
-	DUCKDB_API void AlignNext();
+	void AlignNext() {
+		if (head && !ValueIsAligned<idx_t>(head->current_position)) {
+			// move the current position forward so that the next allocation is aligned
+			head->current_position = AlignValue<idx_t>(head->current_position);
+		}
+	}
 
 	//! This shrinks the LAST allocation that was made using the allocator
 	//! Note that we can ONLY safely call this method if Allocate has been called previously with a size >= shrink_size
