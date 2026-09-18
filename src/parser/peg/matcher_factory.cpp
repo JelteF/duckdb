@@ -34,6 +34,11 @@ bool DescribeLadderLevel(ListMatcher &matcher, PrecedenceLevel &level) {
 	}
 	auto &children = matcher.matchers;
 	if (children.size() == 1) {
+		// a rule whose body is one ordered choice is matched by the choice itself, which builds the rule's result;
+		// it forwards a chosen alternative rather than an operand, so it is not a level of the ladder
+		if (children[0].get().Type() == MatcherType::CHOICE) {
+			return false;
+		}
 		level.shape = PrecedenceShape::ALIAS;
 		level.operand = children[0].get();
 		return true;
@@ -379,6 +384,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddCollapsibleRule("AtTimeZoneExpression");
 	AddCollapsibleRule("PrefixExpression");
 	AddCollapsibleRule("BaseExpression");
+	AddCollapsibleRule("SingleExpression");
 
 	AddPackratMemoizedRule("SingleExpression");
 	AddPackratMemoizedRule("BaseExpression");

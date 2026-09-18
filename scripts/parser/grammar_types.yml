@@ -1826,6 +1826,7 @@ collapsible_rules:
   - AtTimeZoneExpression
   - PrefixExpression
   - BaseExpression
+  - SingleExpression
 
 # The levels of the operator precedence ladder are deliberately not here: they form a chain that is
 # entered once per operand position rather than a rule several ordered choices re-enter at the same

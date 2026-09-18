@@ -187,6 +187,10 @@ private:
 			}
 			passthrough = child_result;
 		}
+		// the collapsed result is transformed as itself, which needs a rule of its own to be transformed by
+		if (passthrough && !passthrough->GetRule()) {
+			return nullptr;
+		}
 		return passthrough;
 	}
 
@@ -474,8 +478,16 @@ public:
 				if (!child_result->HasParseResult()) {
 					return MatchStep::Complete(WrapResult(nullptr));
 				}
-				auto choice_result = state.AllocateParseResult<ChoiceParseResult>(*child_result->GetParseResult(),
-				                                                                  child_index, start_offset);
+				auto &alternative = *child_result->GetParseResult();
+				// A collapsible rule whose body is only this choice returns the alternative unchanged, so neither
+				// the choice node nor the list node it would be wrapped in is built. The alternative has to carry
+				// its own rule, since that is what the transformer runs in place of the collapsed rule.
+				if (wrapper && wrapper->IsCollapsible() && alternative.GetRule()) {
+					alternative.collapsed = true;
+					return MatchStep::Complete(MatcherResult::Success(&alternative));
+				}
+				auto choice_result =
+				    state.AllocateParseResult<ChoiceParseResult>(alternative, child_index, start_offset);
 				return MatchStep::Complete(WrapResult(choice_result.GetParseResult()));
 			}
 			if (SINGLE_CHILD) {
@@ -506,10 +518,6 @@ private:
 		}
 		if (!choice_result) {
 			return state.AllocateParseResult<ListParseResult>(ParseResultChildren(), WrapperName(), start_offset);
-		}
-		if (wrapper->IsCollapsible()) {
-			choice_result->collapsed = true;
-			return MatcherResult::Success(choice_result);
 		}
 		reference<ParseResult> children[1] = {*choice_result};
 		auto list_children = state.context.allocator.MakeChildren(children, 1);
