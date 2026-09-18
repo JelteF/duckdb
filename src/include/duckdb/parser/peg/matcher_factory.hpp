@@ -61,6 +61,11 @@ protected:
 	void AddKeywordOverride(const char *name, KeywordInfo keyword_info);
 	void AddRuleOverride(const char *name, unique_ptr<Matcher> &&matcher_p);
 	void AddPackratMemoizedRule(const char *name);
+	//! Mark a rule of the form `X <- Y Tail*` (or `Prefix* Y`) whose transformer returns Y's result unchanged when no
+	//! tail matched. When such a rule matches only Y, the matcher hands out Y's parse result directly instead of
+	//! wrapping it, and the transformer runs Y's transform on it. The operator precedence ladder is 16 levels of
+	//! these, so for a plain literal this saves 16 parse results, 16 matcher frames and 16 transform frames.
+	void AddCollapsibleRule(const char *name);
 	void SuppressSuggestions(const char *name);
 	Matcher &CreateMatcher(string_t rule_name);
 	Matcher &CreateMatcher(string_t rule_name, vector<reference<Matcher>> &parameters);
@@ -83,6 +88,7 @@ private:
 	case_insensitive_map_t<KeywordInfo> keyword_overrides;
 	string_set_t no_suggestion_rules;
 	string_set_t packrat_memoized_rules;
+	string_set_t collapsible_rules;
 	//! Dense ids handed out to memoized matchers, see Matcher::SetPackratMemoized
 	idx_t packrat_matcher_count = 0;
 };

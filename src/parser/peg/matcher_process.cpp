@@ -90,12 +90,37 @@ public:
 		}
 		state.token_iterator.SetPosition(list_state.token_iterator);
 		DiscardSuggestions();
+		if (matcher.IsCollapsible()) {
+			auto passthrough = FindPassthroughResult();
+			if (passthrough) {
+				passthrough->collapsed = true;
+				return MatchStep::Complete(MatcherResult::Success(passthrough));
+			}
+		}
 		auto list_name = matcher.HasName() ? matcher.GetName() : string();
 		return MatchStep::Complete(
 		    state.AllocateParseResult<ListParseResult>(std::move(results), std::move(list_name), start_offset));
 	}
 
 private:
+	//! For a collapsible rule: the single child that produced a result, provided every other child is an optional
+	//! that matched nothing. Returns nullptr when the list cannot be collapsed.
+	optional_ptr<ParseResult> FindPassthroughResult() const {
+		optional_ptr<ParseResult> passthrough;
+		for (auto &child : results) {
+			auto &child_result = child.get();
+			if (child_result.type == ParseResultType::OPTIONAL &&
+			    !child_result.Cast<OptionalParseResult>().HasResult()) {
+				continue;
+			}
+			if (passthrough) {
+				return nullptr;
+			}
+			passthrough = child_result;
+		}
+		return passthrough;
+	}
+
 	void DiscardSuggestions() {
 		if (!matcher.suppress_suggestions) {
 			return;
