@@ -30,6 +30,7 @@ class ParseResultAllocator;
 class Matcher;
 class MatcherAllocator;
 class MatchProcess;
+struct PrecedenceLadder;
 
 enum class SuggestionState : uint8_t {
 	SUGGEST_KEYWORD,
@@ -441,9 +442,12 @@ public:
 	Matcher &Allocate(unique_ptr<Matcher> matcher);
 	//! Compute MatcherStartSet for every allocated matcher. Called once the matcher graph of a grammar is complete.
 	void ComputeStartSets();
+	//! Take ownership of a precedence ladder, which lives as long as the matchers that refer to it
+	PrecedenceLadder &AddLadder(unique_ptr<PrecedenceLadder> ladder);
 
 private:
 	vector<unique_ptr<Matcher>> matchers;
+	vector<unique_ptr<PrecedenceLadder>> ladders;
 };
 
 //! Owns the parse results of one match run. Results are carved out of an arena instead of being allocated one by
