@@ -355,11 +355,12 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddKeywordOverride("TABLE", KeywordInfo(1, ' '));
 	AddKeywordOverride(".", KeywordInfo(0, '\0'));
 	AddKeywordOverride("(", KeywordInfo(0, '\0'));
-	// packrat memoized rules
+	// matcher rule flags, from packrat_memoized_rules and collapsible_rules in scripts/parser/grammar_types.yml
 	//===--------------------------------------------------------------------===//
-	// START GENERATED PACKRAT MEMOIZED RULES
+	// START GENERATED MATCHER RULE FLAGS
 	//===--------------------------------------------------------------------===//
-	// Precedence ladder levels whose transformer is the identity when no operator follows the operand
+	// Rules whose transformer returns their operand unchanged when the rest of the rule
+	// matched nothing; the matcher hands out that operand's parse result instead of its own
 	AddCollapsibleRule("Expression");
 	AddCollapsibleRule("LambdaArrowExpression");
 	AddCollapsibleRule("LogicalOrExpression");
@@ -388,7 +389,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddPackratMemoizedRule("ColumnReference");
 	AddPackratMemoizedRule("FunctionExpression");
 	//===--------------------------------------------------------------------===//
-	// END GENERATED PACKRAT MEMOIZED RULES
+	// END GENERATED MATCHER RULE FLAGS
 	//===--------------------------------------------------------------------===//
 
 	for (auto &entry : terminal_rule_overrides) {
