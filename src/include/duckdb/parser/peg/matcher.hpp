@@ -343,6 +343,13 @@ public:
 	bool IsPackratMemoized() const {
 		return packrat_memoized;
 	}
+	//! See MatcherFactory::AddCollapsibleRule
+	void SetCollapsible() {
+		collapsible = true;
+	}
+	bool IsCollapsible() const {
+		return collapsible;
+	}
 
 public:
 	template <class TARGET>
@@ -367,6 +374,7 @@ protected:
 	string name;
 	optional_idx packrat_id;
 	bool packrat_memoized = false;
+	bool collapsible = false;
 	optional_ptr<const CompiledGrammarRule> rule;
 	//! See MatcherStartSet; null until MatcherAllocator::ComputeStartSets ran (MayMatchHere then falls back to the
 	//! matcher's own CanStartWith)
