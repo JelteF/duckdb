@@ -20,6 +20,11 @@ struct MatcherToken {
 	    : type(type_p), text(std::move(text_p)), offset(offset_p), unterminated(unterminated_p) {
 		length = text.length();
 	}
+	//! Build the text straight from the query, so that the tokenizer does not construct a temporary string per token
+	//! and then move it into place
+	MatcherToken(const char *text_p, idx_t length_p, idx_t offset_p, TokenType type_p, bool unterminated_p = false)
+	    : type(type_p), text(text_p, length_p), offset(offset_p), length(length_p), unterminated(unterminated_p) {
+	}
 
 	TokenType type;
 	string text;
