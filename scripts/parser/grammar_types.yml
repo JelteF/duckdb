@@ -46,7 +46,7 @@
 # ---------------------------------------------------------------------------
 
 additional_transform_result_types:
-  - "unique_ptr<TransformResultValue>"
+  - "transform_result_ptr"
   - "vector<Identifier>"
 
 SQLStatementList:
