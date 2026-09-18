@@ -60,13 +60,6 @@ idx_t TokenIterator::EndOffset() const {
 	return last_token.offset + last_token.length;
 }
 
-optional_ptr<const MatcherToken> TokenIterator::Current() const {
-	if (position >= tokens.size()) {
-		return nullptr;
-	}
-	return tokens[position];
-}
-
 const MatcherToken &TokenIterator::Previous() const {
 	if (position == 0) {
 		throw InternalException("TokenIterator has no previous token");
