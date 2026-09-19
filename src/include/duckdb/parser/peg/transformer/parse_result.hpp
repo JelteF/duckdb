@@ -136,6 +136,9 @@ public:
 	ParseResultType type;
 	string name;
 	optional_ptr<const CompiledGrammarRule> rule;
+	//! Set when a collapsible rule (see MatcherFactory::AddCollapsibleRule) handed out this child result in place of
+	//! its own. The transformer then runs this result's own rule even if the parent asked for the collapsed rule.
+	bool collapsed = false;
 	optional_idx offset;
 	//! Source length: for leaf tokens the token length; for composite results the enclosing extent of children
 	optional_idx length;

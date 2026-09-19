@@ -166,6 +166,9 @@ Matcher &MatcherFactory::CreateMatcher(string_t rule_name, vector<reference<Matc
 	if (packrat_memoized_rules.count(rule_name)) {
 		matcher.SetPackratMemoized(packrat_matcher_count++);
 	}
+	if (collapsible_rules.count(rule_name)) {
+		matcher.SetCollapsible();
+	}
 	if (no_suggestion_rules.count(rule_name)) {
 		matcher.Cast<ListMatcher>().suppress_suggestions = true;
 	}
@@ -196,6 +199,10 @@ void MatcherFactory::AddPackratMemoizedRule(const char *name) {
 	packrat_memoized_rules.insert(name);
 }
 
+void MatcherFactory::AddCollapsibleRule(const char *name) {
+	collapsible_rules.insert(name);
+}
+
 void MatcherFactory::SuppressSuggestions(const char *name) {
 	no_suggestion_rules.insert(name);
 }
@@ -212,10 +219,31 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddKeywordOverride("TABLE", KeywordInfo(1, ' '));
 	AddKeywordOverride(".", KeywordInfo(0, '\0'));
 	AddKeywordOverride("(", KeywordInfo(0, '\0'));
-	// packrat memoized rules
+	// matcher rule flags, from packrat_memoized_rules and collapsible_rules in scripts/parser/grammar_types.yml
 	//===--------------------------------------------------------------------===//
-	// START GENERATED PACKRAT MEMOIZED RULES
+	// START GENERATED MATCHER RULE FLAGS
 	//===--------------------------------------------------------------------===//
+	// Rules whose transformer returns their operand unchanged when the rest of the rule
+	// matched nothing; the matcher hands out that operand's parse result instead of its own
+	AddCollapsibleRule("Expression");
+	AddCollapsibleRule("LambdaArrowExpression");
+	AddCollapsibleRule("LogicalOrExpression");
+	AddCollapsibleRule("LogicalAndExpression");
+	AddCollapsibleRule("LogicalNotExpression");
+	AddCollapsibleRule("IsExpression");
+	AddCollapsibleRule("IsDistinctFromExpression");
+	AddCollapsibleRule("ComparisonExpression");
+	AddCollapsibleRule("BetweenInLikeExpression");
+	AddCollapsibleRule("OtherOperatorExpression");
+	AddCollapsibleRule("BitwiseExpression");
+	AddCollapsibleRule("AdditiveExpression");
+	AddCollapsibleRule("MultiplicativeExpression");
+	AddCollapsibleRule("ExponentiationExpression");
+	AddCollapsibleRule("CollateExpression");
+	AddCollapsibleRule("AtTimeZoneExpression");
+	AddCollapsibleRule("PrefixExpression");
+	AddCollapsibleRule("BaseExpression");
+
 	AddPackratMemoizedRule("Expression");
 	AddPackratMemoizedRule("LambdaArrowExpression");
 	AddPackratMemoizedRule("LogicalOrExpression");
@@ -239,7 +267,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddPackratMemoizedRule("ColumnReference");
 	AddPackratMemoizedRule("FunctionExpression");
 	//===--------------------------------------------------------------------===//
-	// END GENERATED PACKRAT MEMOIZED RULES
+	// END GENERATED MATCHER RULE FLAGS
 	//===--------------------------------------------------------------------===//
 
 	for (auto &entry : terminal_rule_overrides) {

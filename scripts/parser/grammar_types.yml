@@ -1803,6 +1803,29 @@ matcher_rule_overrides:
     allow_type_overlap: true
     matcher: operator
 
+# collapsible_rules: rules of the form `X <- Y`, `X <- Y Tail*`, `X <- Y Tail?` or `X <- Prefix? Y`
+# whose transformer returns Y's result unchanged when the rest of the rule matched nothing. When such
+# a rule matches only Y, the matcher hands out Y's parse result instead of wrapping it.
+collapsible_rules:
+  - Expression
+  - LambdaArrowExpression
+  - LogicalOrExpression
+  - LogicalAndExpression
+  - LogicalNotExpression
+  - IsExpression
+  - IsDistinctFromExpression
+  - ComparisonExpression
+  - BetweenInLikeExpression
+  - OtherOperatorExpression
+  - BitwiseExpression
+  - AdditiveExpression
+  - MultiplicativeExpression
+  - ExponentiationExpression
+  - CollateExpression
+  - AtTimeZoneExpression
+  - PrefixExpression
+  - BaseExpression
+
 packrat_memoized_rules:
   - Expression
   - LambdaArrowExpression

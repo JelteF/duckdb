@@ -12,6 +12,7 @@ from grammar_types import (
     load_additional_transform_result_types,
     load_grammar_types,
     load_matcher_rule_overrides,
+    load_collapsible_rules,
     load_packrat_memoized_rules,
 )
 from transformer_trampoline_config import (
@@ -91,8 +92,8 @@ TRAMPOLINE_END_BLOCK = (
 SEPARATOR = "\t//===--------------------------------------------------------------------===//\n"
 MATCHER_START_BLOCK = SEPARATOR + "\t// START GENERATED RULE OVERRIDES\n" + SEPARATOR
 MATCHER_END_BLOCK = SEPARATOR + "\t// END GENERATED RULE OVERRIDES\n" + SEPARATOR
-PACKRAT_START_BLOCK = SEPARATOR + "\t// START GENERATED PACKRAT MEMOIZED RULES\n" + SEPARATOR
-PACKRAT_END_BLOCK = SEPARATOR + "\t// END GENERATED PACKRAT MEMOIZED RULES\n" + SEPARATOR
+RULE_FLAGS_START_BLOCK = SEPARATOR + "\t// START GENERATED MATCHER RULE FLAGS\n" + SEPARATOR
+RULE_FLAGS_END_BLOCK = SEPARATOR + "\t// END GENERATED MATCHER RULE FLAGS\n" + SEPARATOR
 RESULT_TYPE_SEPARATOR = "//===--------------------------------------------------------------------===//\n"
 RESULT_TYPE_START_BLOCK = RESULT_TYPE_SEPARATOR + "// START GENERATED TRANSFORM RESULT TYPES\n" + RESULT_TYPE_SEPARATOR
 RESULT_TYPE_END_BLOCK = RESULT_TYPE_SEPARATOR + "// END GENERATED TRANSFORM RESULT TYPES\n" + RESULT_TYPE_SEPARATOR
@@ -1528,13 +1529,19 @@ def write_matcher_rule_overrides(matcher_overrides):
     print(f"Updated {matcher_override_cpp_path}")
 
 
-def write_packrat_memoized_rules(packrat_memoized_rules):
+def write_matcher_rule_flags(packrat_memoized_rules, collapsible_rules):
     content = matcher_cpp_path.read_text()
-    lines = [f'\tAddPackratMemoizedRule("{rule_name}");\n' for rule_name in packrat_memoized_rules]
+    lines = []
+    if collapsible_rules:
+        lines.append("\t// Rules whose transformer returns their operand unchanged when the rest of the rule\n")
+        lines.append("\t// matched nothing; the matcher hands out that operand's parse result instead of its own\n")
+        lines += [f'\tAddCollapsibleRule("{rule_name}");\n' for rule_name in collapsible_rules]
+        lines.append("\n")
+    lines += [f'\tAddPackratMemoizedRule("{rule_name}");\n' for rule_name in packrat_memoized_rules]
     content = replace_generated_block(
         content,
-        PACKRAT_START_BLOCK,
-        PACKRAT_END_BLOCK,
+        RULE_FLAGS_START_BLOCK,
+        RULE_FLAGS_END_BLOCK,
         "".join(lines),
         matcher_cpp_path,
     )
@@ -1589,7 +1596,8 @@ def main():
         write_cpp(emitter.emit_source())
         write_matcher_rule_overrides(matcher_override_config)
         packrat_rules = load_packrat_memoized_rules(grammar_types_file, all_rules.keys())
-        write_packrat_memoized_rules(packrat_rules)
+        collapsible_rules = load_collapsible_rules(grammar_types_file, all_rules.keys())
+        write_matcher_rule_flags(packrat_rules, collapsible_rules)
     elif args.report:
         print(f"grammar files: {', '.join(grammar_files)}")
         print(emitter.emit_report())
