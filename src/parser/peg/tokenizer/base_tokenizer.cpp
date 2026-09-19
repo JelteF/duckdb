@@ -54,13 +54,6 @@ bool Tokenizer::IsSingleByteOperator(char c) {
 	}
 }
 
-bool Tokenizer::CharacterIsInitialNumber(char c) {
-	if (c >= '0' && c <= '9') {
-		return true;
-	}
-	return c == '.';
-}
-
 bool Tokenizer::CharacterIsSpecialStringCharacter(char c) {
 	if (c == 'N' || c == 'n') {
 		return true;
