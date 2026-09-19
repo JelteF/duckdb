@@ -300,8 +300,10 @@ struct MatcherStartSet {
 	//! grammar, so reaching them is a load from a contiguous region rather than a chase into a node of its own.
 	const uint64_t *literal_words = nullptr;
 	uint32_t literal_word_count = 0;
-	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
-	vector<reference<const Matcher>> predicate_leaders;
+	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher. Like the bitmap,
+	//! these live in one buffer for the whole grammar rather than a vector per set.
+	const reference<const Matcher> *leaders = nullptr;
+	uint32_t leader_count = 0;
 
 	bool HasLiteral(uint16_t literal_id) const {
 		auto word = static_cast<idx_t>(literal_id) / 64;
@@ -364,7 +366,7 @@ public:
 				return true;
 			}
 		}
-		if (set->predicate_leaders.empty()) {
+		if (set->leader_count == 0) {
 			return false;
 		}
 		return MatchesPredicateLeader(state, *set);
@@ -501,6 +503,7 @@ private:
 	//! graph is walked at random, so what costs is the chase into a scattered node, not the bytes.
 	vector<MatcherStartSet> start_sets;
 	vector<uint64_t> start_set_bits;
+	vector<reference<const Matcher>> start_set_leaders;
 };
 
 //! Owns the parse results of one match run. Results are carved out of an arena instead of being allocated one by

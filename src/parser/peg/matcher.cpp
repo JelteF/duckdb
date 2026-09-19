@@ -68,8 +68,8 @@ void MatchState::AddSuggestion(MatcherSuggestion suggestion) {
 }
 
 bool Matcher::MatchesPredicateLeader(MatchState &state, const MatcherStartSet &set) const {
-	for (auto &leader : set.predicate_leaders) {
-		if (leader.get().CanStartWith(state, 0)) {
+	for (idx_t i = 0; i < set.leader_count; i++) {
+		if (set.leaders[i].get().CanStartWith(state, 0)) {
 			return true;
 		}
 	}
@@ -86,6 +86,8 @@ public:
 		unique_ptr<MatcherStartSet> set;
 		//! Literal ids as a bitmap, so that merging up the graph is a word-wise OR. The finished set keeps it.
 		vector<uint64_t> literal_bits;
+		//! Collected while building; ComputeStartSets moves them into the allocator's shared buffer
+		vector<reference<const Matcher>> predicate_leaders;
 		bool nullable = false;
 		bool in_progress = false;
 	};
@@ -108,7 +110,7 @@ public:
 				set->literal_table = keyword.GetLiteralTable();
 				SetBit(entry.literal_bits, keyword.LiteralId());
 			} else {
-				set->predicate_leaders.push_back(matcher);
+				entry.predicate_leaders.push_back(matcher);
 			}
 			break;
 		}
@@ -147,7 +149,7 @@ public:
 		case MatcherType::STRING_LITERAL:
 		case MatcherType::END_OF_INPUT:
 			// these answer CanStartWith from the token itself
-			set->predicate_leaders.push_back(matcher);
+			entry.predicate_leaders.push_back(matcher);
 			break;
 		default:
 			set->any = true;
@@ -160,10 +162,12 @@ public:
 		return entry;
 	}
 
-	unique_ptr<MatcherStartSet> Take(const Matcher &matcher, bool &nullable, vector<uint64_t> &literal_bits) {
+	unique_ptr<MatcherStartSet> Take(const Matcher &matcher, bool &nullable, vector<uint64_t> &literal_bits,
+	                                 vector<reference<const Matcher>> &leaders) {
 		auto &entry = Compute(matcher);
 		nullable = entry.nullable;
 		literal_bits = entry.literal_bits;
+		leaders = entry.predicate_leaders;
 		return std::move(entry.set);
 	}
 
@@ -190,16 +194,16 @@ private:
 				target_entry.literal_bits[word] |= source.literal_bits[word];
 			}
 		}
-		for (auto &leader : set.predicate_leaders) {
+		for (auto &leader : source.predicate_leaders) {
 			bool present = false;
-			for (auto &existing : target.predicate_leaders) {
+			for (auto &existing : target_entry.predicate_leaders) {
 				if (&existing.get() == &leader.get()) {
 					present = true;
 					break;
 				}
 			}
 			if (!present) {
-				target.predicate_leaders.push_back(leader);
+				target_entry.predicate_leaders.push_back(leader);
 			}
 		}
 	}
@@ -228,19 +232,27 @@ void MatcherAllocator::ComputeStartSets() {
 	start_sets.resize(matchers.size());
 	vector<idx_t> bit_offsets(matchers.size());
 	vector<idx_t> bit_counts(matchers.size());
+	vector<idx_t> leader_offsets(matchers.size());
+	vector<idx_t> leader_counts(matchers.size());
 	for (idx_t i = 0; i < matchers.size(); i++) {
 		vector<uint64_t> literal_bits;
-		auto set = builder.Take(*matchers[i], matchers[i]->nullable, literal_bits);
+		vector<reference<const Matcher>> leaders;
+		auto set = builder.Take(*matchers[i], matchers[i]->nullable, literal_bits, leaders);
 		start_sets[i] = std::move(*set);
 		bit_offsets[i] = start_set_bits.size();
 		bit_counts[i] = literal_bits.size();
 		start_set_bits.insert(start_set_bits.end(), literal_bits.begin(), literal_bits.end());
+		leader_offsets[i] = start_set_leaders.size();
+		leader_counts[i] = leaders.size();
+		start_set_leaders.insert(start_set_leaders.end(), leaders.begin(), leaders.end());
 	}
 	// only now is the buffer final, so only now can the spans into it be resolved
 	for (idx_t i = 0; i < matchers.size(); i++) {
 		auto &set = start_sets[i];
 		set.literal_words = start_set_bits.data() + bit_offsets[i];
 		set.literal_word_count = NumericCast<uint32_t>(bit_counts[i]);
+		set.leaders = start_set_leaders.data() + leader_offsets[i];
+		set.leader_count = NumericCast<uint32_t>(leader_counts[i]);
 		matchers[i]->start_set = set;
 	}
 }

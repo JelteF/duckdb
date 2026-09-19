@@ -280,7 +280,7 @@ static void BuildLadderLevelMasks(PrecedenceLadder &ladder) {
 		}
 		auto level_bit = uint32_t(1) << level;
 		auto start_set = entry.affix->GetStartSet();
-		if (!start_set || start_set->any || !start_set->predicate_leaders.empty()) {
+		if (!start_set || start_set->any || start_set->leader_count != 0) {
 			ladder.predicate_levels |= level_bit;
 		}
 		if (!start_set) {
