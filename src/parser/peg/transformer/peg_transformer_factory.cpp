@@ -53,7 +53,7 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformTopLevelStatement(Token
 	}
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator parse_result_allocator;
-	ParserPackratCache packrat_cache;
+	ParserPackratCache packrat_cache(token_iterator.Position(), token_iterator.Size(), grammar.PackratMatcherCount());
 	idx_t max_token_index = token_iterator.Position();
 	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
 	MatchContext match_context(suggestions, parse_result_allocator, process_allocator, max_token_index,
@@ -75,7 +75,7 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformTopLevelStatement(Token
 			error_token_idx--;
 		}
 		auto &error_token = token_iterator.GetToken(error_token_idx);
-		auto error_message = "syntax error at or near \"" + error_token.text + "\"";
+		auto error_message = "syntax error at or near \"" + string {error_token.text} + "\"";
 		throw ParserException::SyntaxError(token_stream, error_message,
 		                                   QueryLocation(error_token.offset, error_token.length));
 	}
@@ -111,13 +111,321 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformTopLevelStatement(Token
 
 PEGTransformerFactory::PEGTransformerFactory(ParsedGrammar &grammar_p) : grammar(grammar_p) {
 	for (auto &entry : GeneratedTransformFrameOps()) {
-		auto process_info = entry.second;
-		grammar.SetTransformProcess(
-		    entry.first,
-		    [process_info](PEGTransformer &transformer, ParseResult &parse_result) -> unique_ptr<TransformProcess> {
-			    return make_uniq<GeneratedTransformProcess>(transformer, TransformInput {parse_result}, *process_info);
-		    });
+		grammar.SetGeneratedTransformOps(entry.first, *entry.second);
 	}
+	// rules whose transformer never asks for a child, so TransformStack runs them without a frame
+	//===--------------------------------------------------------------------===//
+	// START GENERATED CHILDLESS TRANSFORM RULES
+	//===--------------------------------------------------------------------===//
+	grammar.SetChildlessTransform("IdentifierDot");
+	grammar.SetChildlessTransform("RenameAlter");
+	grammar.SetChildlessTransform("ResetPartitionedBy");
+	grammar.SetChildlessTransform("ResetSortedBy");
+	grammar.SetChildlessTransform("DropDefault");
+	grammar.SetChildlessTransform("DropNullability");
+	grammar.SetChildlessTransform("SetNullability");
+	grammar.SetChildlessTransform("AnalyzeVerbose");
+	grammar.SetChildlessTransform("CheckpointForce");
+	grammar.SetChildlessTransform("CommentTable");
+	grammar.SetChildlessTransform("CommentSequence");
+	grammar.SetChildlessTransform("CommentFunction");
+	grammar.SetChildlessTransform("CommentMacroTable");
+	grammar.SetChildlessTransform("CommentMacro");
+	grammar.SetChildlessTransform("CommentView");
+	grammar.SetChildlessTransform("CommentDatabase");
+	grammar.SetChildlessTransform("CommentIndex");
+	grammar.SetChildlessTransform("CommentSchema");
+	grammar.SetChildlessTransform("CommentType");
+	grammar.SetChildlessTransform("CommentColumn");
+	grammar.SetChildlessTransform("StringLiteralValue");
+	grammar.SetChildlessTransform("AnalyzeKeyword");
+	grammar.SetChildlessTransform("IndexName");
+	grammar.SetChildlessTransform("SequenceName");
+	grammar.SetChildlessTransform("CollationName");
+	grammar.SetChildlessTransform("NumberLiteral");
+	grammar.SetChildlessTransform("StringLiteral");
+	grammar.SetChildlessTransform("IntervalWithoutSpecifier");
+	grammar.SetChildlessTransform("YearKeyword");
+	grammar.SetChildlessTransform("MonthKeyword");
+	grammar.SetChildlessTransform("DayKeyword");
+	grammar.SetChildlessTransform("HourKeyword");
+	grammar.SetChildlessTransform("MinuteKeyword");
+	grammar.SetChildlessTransform("SecondKeyword");
+	grammar.SetChildlessTransform("MillisecondKeyword");
+	grammar.SetChildlessTransform("MicrosecondKeyword");
+	grammar.SetChildlessTransform("WeekKeyword");
+	grammar.SetChildlessTransform("QuarterKeyword");
+	grammar.SetChildlessTransform("DecadeKeyword");
+	grammar.SetChildlessTransform("CenturyKeyword");
+	grammar.SetChildlessTransform("MillenniumKeyword");
+	grammar.SetChildlessTransform("VariantType");
+	grammar.SetChildlessTransform("IntType");
+	grammar.SetChildlessTransform("IntegerType");
+	grammar.SetChildlessTransform("SmallintType");
+	grammar.SetChildlessTransform("BigintType");
+	grammar.SetChildlessTransform("RealType");
+	grammar.SetChildlessTransform("BooleanType");
+	grammar.SetChildlessTransform("DoubleType");
+	grammar.SetChildlessTransform("FloatType");
+	grammar.SetChildlessTransform("TypeNameAsQualifiedName");
+	grammar.SetChildlessTransform("ArrayKeyword");
+	grammar.SetChildlessTransform("TimeTypeId");
+	grammar.SetChildlessTransform("TimestampTypeId");
+	grammar.SetChildlessTransform("WithRule");
+	grammar.SetChildlessTransform("WithoutRule");
+	grammar.SetChildlessTransform("DisconnectStatement");
+	grammar.SetChildlessTransform("LocalSessionTarget");
+	grammar.SetChildlessTransform("CatalogSessionTarget");
+	grammar.SetChildlessTransform("CopyFrom");
+	grammar.SetChildlessTransform("CopyTo");
+	grammar.SetChildlessTransform("CopyFileNameStringLiteral");
+	grammar.SetChildlessTransform("CopyFileNameIdentifier");
+	grammar.SetChildlessTransform("BinaryOption");
+	grammar.SetChildlessTransform("FreezeOption");
+	grammar.SetChildlessTransform("OidsOption");
+	grammar.SetChildlessTransform("CsvOption");
+	grammar.SetChildlessTransform("HeaderOption");
+	grammar.SetChildlessTransform("NullAsOption");
+	grammar.SetChildlessTransform("DelimiterAsOption");
+	grammar.SetChildlessTransform("QuoteAsOption");
+	grammar.SetChildlessTransform("EscapeAsOption");
+	grammar.SetChildlessTransform("EncodingOption");
+	grammar.SetChildlessTransform("ForceQuote");
+	grammar.SetChildlessTransform("StarPartitionByColumnList");
+	grammar.SetChildlessTransform("ForceNotNull");
+	grammar.SetChildlessTransform("CopySchema");
+	grammar.SetChildlessTransform("CopyData");
+	grammar.SetChildlessTransform("WithOids");
+	grammar.SetChildlessTransform("WithoutOids");
+	grammar.SetChildlessTransform("UniqueIndex");
+	grammar.SetChildlessTransform("IndexType");
+	grammar.SetChildlessTransform("DefArgKeyword");
+	grammar.SetChildlessTransform("DefArgStringLiteral");
+	grammar.SetChildlessTransform("NoneLiteral");
+	grammar.SetChildlessTransform("MacroKeyword");
+	grammar.SetChildlessTransform("FunctionKeyword");
+	grammar.SetChildlessTransform("SecretStorageSpecifier");
+	grammar.SetChildlessTransform("SeqCycle");
+	grammar.SetChildlessTransform("SeqNoCycle");
+	grammar.SetChildlessTransform("MinValue");
+	grammar.SetChildlessTransform("MaxValue");
+	grammar.SetChildlessTransform("OrReplace");
+	grammar.SetChildlessTransform("Persistent");
+	grammar.SetChildlessTransform("TempPersistent");
+	grammar.SetChildlessTransform("TemporaryPersistent");
+	grammar.SetChildlessTransform("WithDataOnly");
+	grammar.SetChildlessTransform("WithNoData");
+	grammar.SetChildlessTransform("IdentifierList");
+	grammar.SetChildlessTransform("IfNotExists");
+	grammar.SetChildlessTransform("CatalogQualification");
+	grammar.SetChildlessTransform("SchemaQualification");
+	grammar.SetChildlessTransform("ReservedSchemaQualification");
+	grammar.SetChildlessTransform("TableQualification");
+	grammar.SetChildlessTransform("ReservedTableQualification");
+	grammar.SetChildlessTransform("NullConstraint");
+	grammar.SetChildlessTransform("NotNullColumnConstraint");
+	grammar.SetChildlessTransform("UniqueConstraint");
+	grammar.SetChildlessTransform("PrimaryKeyConstraint");
+	grammar.SetChildlessTransform("NoKeyAction");
+	grammar.SetChildlessTransform("RestrictKeyAction");
+	grammar.SetChildlessTransform("CascadeKeyAction");
+	grammar.SetChildlessTransform("SetNullKeyAction");
+	grammar.SetChildlessTransform("SetDefaultKeyAction");
+	grammar.SetChildlessTransform("Identifier");
+	grammar.SetChildlessTransform("StringLiteralIdentifier");
+	grammar.SetChildlessTransform("PreserveRows");
+	grammar.SetChildlessTransform("DeleteRows");
+	grammar.SetChildlessTransform("VirtualGeneratedColumn");
+	grammar.SetChildlessTransform("StoredGeneratedColumn");
+	grammar.SetChildlessTransform("TriggerName");
+	grammar.SetChildlessTransform("TriggerBefore");
+	grammar.SetChildlessTransform("TriggerAfter");
+	grammar.SetChildlessTransform("TriggerInsteadOf");
+	grammar.SetChildlessTransform("TriggerEventInsert");
+	grammar.SetChildlessTransform("TriggerEventDelete");
+	grammar.SetChildlessTransform("TriggerEventUpdate");
+	grammar.SetChildlessTransform("ForEachRow");
+	grammar.SetChildlessTransform("ForEachStatement");
+	grammar.SetChildlessTransform("EnumStringLiteralList");
+	grammar.SetChildlessTransform("CreateRecursive");
+	grammar.SetChildlessTransform("CreateSecure");
+	grammar.SetChildlessTransform("DeallocatePrepare");
+	grammar.SetChildlessTransform("ShowSettingName");
+	grammar.SetChildlessTransform("DescribeStringLiteral");
+	grammar.SetChildlessTransform("SummarizeRule");
+	grammar.SetChildlessTransform("ShowRule");
+	grammar.SetChildlessTransform("DescribeLongRule");
+	grammar.SetChildlessTransform("DescRule");
+	grammar.SetChildlessTransform("QualifiedIndexNameString");
+	grammar.SetChildlessTransform("MaterializedViewEntry");
+	grammar.SetChildlessTransform("FunctionTypeMacroKeyword");
+	grammar.SetChildlessTransform("FunctionTypeFunction");
+	grammar.SetChildlessTransform("CascadeDropBehavior");
+	grammar.SetChildlessTransform("RestrictDropBehavior");
+	grammar.SetChildlessTransform("IfExists");
+	grammar.SetChildlessTransform("DropSecretStorage");
+	grammar.SetChildlessTransform("ExportSource");
+	grammar.SetChildlessTransform("ImportStatement");
+	grammar.SetChildlessTransform("FunctionNameAsQualifiedName");
+	grammar.SetChildlessTransform("DistinctKeyword");
+	grammar.SetChildlessTransform("AllKeyword");
+	grammar.SetChildlessTransform("IgnoreNulls");
+	grammar.SetChildlessTransform("RespectNulls");
+	grammar.SetChildlessTransform("LiteralExpression");
+	grammar.SetChildlessTransform("NullLiteral");
+	grammar.SetChildlessTransform("TrueLiteral");
+	grammar.SetChildlessTransform("FalseLiteral");
+	grammar.SetChildlessTransform("CastKeyword");
+	grammar.SetChildlessTransform("TryCastKeyword");
+	grammar.SetChildlessTransform("SubqueryNot");
+	grammar.SetChildlessTransform("SubqueryExists");
+	grammar.SetChildlessTransform("IntervalStringParameter");
+	grammar.SetChildlessTransform("RowsFraming");
+	grammar.SetChildlessTransform("RangeFraming");
+	grammar.SetChildlessTransform("GroupsFraming");
+	grammar.SetChildlessTransform("FrameCurrentRow");
+	grammar.SetChildlessTransform("PrecedingFrame");
+	grammar.SetChildlessTransform("FollowingFrame");
+	grammar.SetChildlessTransform("ExcludeCurrentRow");
+	grammar.SetChildlessTransform("ExcludeGroup");
+	grammar.SetChildlessTransform("ExcludeTies");
+	grammar.SetChildlessTransform("ExcludeNoOthers");
+	grammar.SetChildlessTransform("IdentifierWindowFrame");
+	grammar.SetChildlessTransform("ParensIdentifier");
+	grammar.SetChildlessTransform("BaseWindowName");
+	grammar.SetChildlessTransform("GroupingKeyword");
+	grammar.SetChildlessTransform("GroupingIdKeyword");
+	grammar.SetChildlessTransform("QuestionMarkNumberedParameter");
+	grammar.SetChildlessTransform("AnonymousParameter");
+	grammar.SetChildlessTransform("NumberedParameter");
+	grammar.SetChildlessTransform("PositionalExpression");
+	grammar.SetChildlessTransform("DefaultExpression");
+	grammar.SetChildlessTransform("NotKeyword");
+	grammar.SetChildlessTransform("UnknownLiteral");
+	grammar.SetChildlessTransform("NotNullKeyword");
+	grammar.SetChildlessTransform("NotNullOperator");
+	grammar.SetChildlessTransform("IsNullOperator");
+	grammar.SetChildlessTransform("IsDistinctFromOp");
+	grammar.SetChildlessTransform("OperatorEqual");
+	grammar.SetChildlessTransform("OperatorNotEqual");
+	grammar.SetChildlessTransform("OperatorLessThan");
+	grammar.SetChildlessTransform("OperatorGreaterThan");
+	grammar.SetChildlessTransform("OperatorLessThanEquals");
+	grammar.SetChildlessTransform("OperatorGreaterThanEquals");
+	grammar.SetChildlessTransform("LikeToken");
+	grammar.SetChildlessTransform("ILikeToken");
+	grammar.SetChildlessTransform("GlobToken");
+	grammar.SetChildlessTransform("SimilarToToken");
+	grammar.SetChildlessTransform("RegexMatchToken");
+	grammar.SetChildlessTransform("RegexInsensitiveMatchToken");
+	grammar.SetChildlessTransform("NotILikeOp");
+	grammar.SetChildlessTransform("NotLikeOp");
+	grammar.SetChildlessTransform("NotRegexInsensitiveMatchOp");
+	grammar.SetChildlessTransform("NotSimilarToOp");
+	grammar.SetChildlessTransform("OperatorLiteral");
+	grammar.SetChildlessTransform("SubqueryAny");
+	grammar.SetChildlessTransform("SubqueryAll");
+	grammar.SetChildlessTransform("InetOperator");
+	grammar.SetChildlessTransform("JsonOperator");
+	grammar.SetChildlessTransform("ListOperator");
+	grammar.SetChildlessTransform("StringOperator");
+	grammar.SetChildlessTransform("AnyOp");
+	grammar.SetChildlessTransform("BitOperator");
+	grammar.SetChildlessTransform("Term");
+	grammar.SetChildlessTransform("Factor");
+	grammar.SetChildlessTransform("ExponentOperator");
+	grammar.SetChildlessTransform("MinusPrefixOperator");
+	grammar.SetChildlessTransform("PlusPrefixOperator");
+	grammar.SetChildlessTransform("TildePrefixOperator");
+	grammar.SetChildlessTransform("EndSliceMinus");
+	grammar.SetChildlessTransform("PostfixOperator");
+	grammar.SetChildlessTransform("TrimBoth");
+	grammar.SetChildlessTransform("TrimLeading");
+	grammar.SetChildlessTransform("TrimTrailing");
+	grammar.SetChildlessTransform("ExtractIdentifierArgument");
+	grammar.SetChildlessTransform("ExtractStringArgument");
+	grammar.SetChildlessTransform("ShowAllModifier");
+	grammar.SetChildlessTransform("InsertOrReplace");
+	grammar.SetChildlessTransform("InsertOrIgnore");
+	grammar.SetChildlessTransform("InsertByName");
+	grammar.SetChildlessTransform("InsertByPosition");
+	grammar.SetChildlessTransform("InsertAlias");
+	grammar.SetChildlessTransform("DefaultValues");
+	grammar.SetChildlessTransform("OnConflictNothing");
+	grammar.SetChildlessTransform("ExtensionAlias");
+	grammar.SetChildlessTransform("InstallAndLoad");
+	grammar.SetChildlessTransform("UpdateExtensionsStatement");
+	grammar.SetChildlessTransform("FromSourceIdentifier");
+	grammar.SetChildlessTransform("FromSourceString");
+	grammar.SetChildlessTransform("RepositoryPrefix");
+	grammar.SetChildlessTransform("RepositoryPublicKey");
+	grammar.SetChildlessTransform("DeleteMatchClause");
+	grammar.SetChildlessTransform("InsertDefaultValues");
+	grammar.SetChildlessTransform("DoNothingMatchClause");
+	grammar.SetChildlessTransform("BySource");
+	grammar.SetChildlessTransform("ByTarget");
+	grammar.SetChildlessTransform("IncludeNulls");
+	grammar.SetChildlessTransform("ExcludeNulls");
+	grammar.SetChildlessTransform("SetopUnion");
+	grammar.SetChildlessTransform("SetopExcept");
+	grammar.SetChildlessTransform("Materialized");
+	grammar.SetChildlessTransform("DistinctAll");
+	grammar.SetChildlessTransform("PivotEnumTarget");
+	grammar.SetChildlessTransform("Lateral");
+	grammar.SetChildlessTransform("UnqualifiedBaseTableName");
+	grammar.SetChildlessTransform("WithOrdinality");
+	grammar.SetChildlessTransform("VersionAtUnit");
+	grammar.SetChildlessTransform("TimestampAtUnit");
+	grammar.SetChildlessTransform("NearestApprox");
+	grammar.SetChildlessTransform("NearestExact");
+	grammar.SetChildlessTransform("NearestDistance");
+	grammar.SetChildlessTransform("NearestSimilarity");
+	grammar.SetChildlessTransform("Asof");
+	grammar.SetChildlessTransform("UsingClause");
+	grammar.SetChildlessTransform("CrossJoinPrefix");
+	grammar.SetChildlessTransform("PositionalJoinPrefix");
+	grammar.SetChildlessTransform("FullJoin");
+	grammar.SetChildlessTransform("LeftJoin");
+	grammar.SetChildlessTransform("RightJoin");
+	grammar.SetChildlessTransform("SemiJoin");
+	grammar.SetChildlessTransform("AntiJoin");
+	grammar.SetChildlessTransform("InnerJoin");
+	grammar.SetChildlessTransform("SampleSeed");
+	grammar.SetChildlessTransform("SamplePercentage");
+	grammar.SetChildlessTransform("SampleRows");
+	grammar.SetChildlessTransform("GroupByAll");
+	grammar.SetChildlessTransform("EmptyGroupingItem");
+	grammar.SetChildlessTransform("CubeKeyword");
+	grammar.SetChildlessTransform("RollupKeyword");
+	grammar.SetChildlessTransform("DescendingOrder");
+	grammar.SetChildlessTransform("AscendingOrder");
+	grammar.SetChildlessTransform("NullsFirst");
+	grammar.SetChildlessTransform("NullsLast");
+	grammar.SetChildlessTransform("LimitAll");
+	grammar.SetChildlessTransform("LimitLiteralPercent");
+	grammar.SetChildlessTransform("SetSchema");
+	grammar.SetChildlessTransform("ZoneLocal");
+	grammar.SetChildlessTransform("ZoneDefault");
+	grammar.SetChildlessTransform("ZoneStringLiteral");
+	grammar.SetChildlessTransform("ZoneIdentifier");
+	grammar.SetChildlessTransform("ZoneIntervalWithPrecision");
+	grammar.SetChildlessTransform("VariableScope");
+	grammar.SetChildlessTransform("LocalScope");
+	grammar.SetChildlessTransform("SessionScope");
+	grammar.SetChildlessTransform("GlobalScope");
+	grammar.SetChildlessTransform("RollbackTransaction");
+	grammar.SetChildlessTransform("CommitTransaction");
+	grammar.SetChildlessTransform("ReadOnly");
+	grammar.SetChildlessTransform("ReadWrite");
+	grammar.SetChildlessTransform("SchemaNameAsUseTarget");
+	grammar.SetChildlessTransform("CatalogNameAsUseTarget");
+	grammar.SetChildlessTransform("DotIdentifier");
+	grammar.SetChildlessTransform("OptFull");
+	grammar.SetChildlessTransform("OptFreeze");
+	grammar.SetChildlessTransform("OptVerbose");
+	//===--------------------------------------------------------------------===//
+	// END GENERATED CHILDLESS TRANSFORM RULES
+	//===--------------------------------------------------------------------===//
 }
 
 void PEGTransformerFactory::RegisterDefaultTransforms(ParsedGrammar &grammar) {
@@ -126,13 +434,19 @@ void PEGTransformerFactory::RegisterDefaultTransforms(ParsedGrammar &grammar) {
 
 vector<reference<ParseResult>> PEGTransformerFactory::ExtractParseResultsFromList(ParseResult &parse_result) {
 	// List(D) <- D (',' D)* ','?
-	vector<reference<ParseResult>> result;
 	auto &list_pr = parse_result.Cast<ListParseResult>();
-	result.push_back(list_pr.GetChild(0));
 	auto &opt_child = list_pr.Child<OptionalParseResult>(1);
+	optional_ptr<RepeatParseResult> tail;
 	if (opt_child.HasResult()) {
-		auto &repeat_result = opt_child.GetResult().Cast<RepeatParseResult>();
-		for (auto &child : repeat_result.GetChildren()) {
+		tail = opt_child.GetResult().Cast<RepeatParseResult>();
+	}
+	vector<reference<ParseResult>> result;
+	// the list is as long as the repeat plus its first element, which a long VALUES row would otherwise reach by
+	// growing a handful of times
+	result.reserve(1 + (tail ? tail->GetChildren().size() : 0));
+	result.push_back(list_pr.GetChild(0));
+	if (tail) {
+		for (auto &child : tail->GetChildren()) {
 			auto &list_child = child.get().Cast<ListParseResult>();
 			result.push_back(list_child.GetChild(1));
 		}

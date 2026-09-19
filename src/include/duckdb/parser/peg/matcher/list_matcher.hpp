@@ -1,6 +1,8 @@
 #pragma once
 
 #include "duckdb/parser/peg/matcher.hpp"
+#include "duckdb/parser/peg/matcher/precedence_ladder.hpp"
+#include "duckdb/parser/peg/matcher/choice_matcher.hpp"
 
 namespace duckdb {
 
@@ -42,10 +44,36 @@ public:
 		return "(" + result + ")";
 	}
 
+	//! Matched as a level of the operator precedence ladder rather than as a plain list. See PrecedenceLadder.
+	void SetPrecedenceLevel(const PrecedenceLadder &ladder_p, idx_t level_p) {
+		ladder = ladder_p;
+		level = level_p;
+	}
+	optional_ptr<const PrecedenceLadder> GetLadder() const {
+		return ladder;
+	}
+
+	//! A rule whose whole body is one ordered choice is matched in the choice's own frame, which builds the list
+	//! result this matcher would have built. See ChoiceMatchProcess.
+	void SetFusedChoice(const ChoiceMatcher &choice) {
+		fused_choice = choice;
+	}
+	optional_ptr<const ChoiceMatcher> GetFusedChoice() const {
+		return fused_choice;
+	}
+	idx_t GetPrecedenceLevel() const {
+		return level;
+	}
+
 public:
 	vector<reference<Matcher>> matchers;
 	//! If true, this matcher will not contribute autocomplete suggestions (used for rules like ExpressionStatement)
 	bool suppress_suggestions = false;
+
+private:
+	optional_ptr<const PrecedenceLadder> ladder;
+	optional_ptr<const ChoiceMatcher> fused_choice;
+	idx_t level = 0;
 };
 
 } // namespace duckdb

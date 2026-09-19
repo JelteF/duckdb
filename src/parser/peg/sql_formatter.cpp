@@ -197,7 +197,7 @@ bool SQLFormatter::ShouldUppercase(const string &kw) {
 string SQLFormatter::PeekKeyword(const vector<MatcherToken> &tokens, idx_t i, idx_t offset) {
 	idx_t j = i + offset;
 	if (j < tokens.size() && tokens[j].type == TokenType::KEYWORD) {
-		return StringUtil::Upper(tokens[j].text);
+		return StringUtil::Upper(string {tokens[j].text});
 	}
 	return "";
 }
@@ -262,7 +262,7 @@ idx_t SQLFormatter::DetectCompoundClause(const vector<MatcherToken> &tokens, idx
 		return result;
 	}();
 
-	const string kw = StringUtil::Upper(tokens[i].text);
+	const string kw = StringUtil::Upper(string {tokens[i].text});
 
 	// Find the longest compound keyword pattern whose first word matches kw.
 	idx_t best_extra = static_cast<idx_t>(-1);
@@ -469,7 +469,7 @@ string SQLFormatter::FormatMultiline(const string &sql, const vector<MatcherToke
 
 		if (tok.type == TokenType::COMMENT) {
 			// Strip trailing newline from comment text — we manage newlines ourselves.
-			string comment_text = tok.text;
+			string comment_text {tok.text};
 			while (!comment_text.empty() && (comment_text.back() == '\n' || comment_text.back() == '\r')) {
 				comment_text.pop_back();
 			}
@@ -681,7 +681,7 @@ string SQLFormatter::FormatMultiline(const string &sql, const vector<MatcherToke
 				}
 			}
 
-			const string upper = StringUtil::Upper(tok.text);
+			const string upper = StringUtil::Upper(string {tok.text});
 
 			if (upper == "BETWEEN") {
 				in_between = true;
@@ -692,7 +692,7 @@ string SQLFormatter::FormatMultiline(const string &sql, const vector<MatcherToke
 				if (upper == "AND" && in_between) {
 					in_between = false;
 					write_space();
-					result += ApplyCase(upper, tok.text, /*is_structural=*/true);
+					result += ApplyCase(upper, string {tok.text}, /*is_structural=*/true);
 					at_line_start = false;
 					prev_was_keyword = true;
 					prev_keyword = upper;
@@ -704,7 +704,7 @@ string SQLFormatter::FormatMultiline(const string &sql, const vector<MatcherToke
 				bool inside_expression_parens = !paren_stack.empty() && !paren_stack.back().has_clauses;
 				if (inside_expression_parens) {
 					write_space();
-					result += ApplyCase(upper, tok.text, /*is_structural=*/true);
+					result += ApplyCase(upper, string {tok.text}, /*is_structural=*/true);
 					at_line_start = false;
 					prev_was_keyword = true;
 					prev_keyword = upper;
@@ -715,7 +715,7 @@ string SQLFormatter::FormatMultiline(const string &sql, const vector<MatcherToke
 					write_newline();
 				}
 				write_indent(content_indent());
-				result += ApplyCase(upper, tok.text, /*is_structural=*/true);
+				result += ApplyCase(upper, string {tok.text}, /*is_structural=*/true);
 				at_line_start = false;
 				after_clause = false;
 				prev_was_keyword = true;
@@ -731,7 +731,7 @@ string SQLFormatter::FormatMultiline(const string &sql, const vector<MatcherToke
 			} else if (!result.empty() && result.back() != '.') {
 				write_space();
 			}
-			result += ApplyCase(upper, tok.text);
+			result += ApplyCase(upper, string {tok.text});
 			at_line_start = false;
 			prev_was_keyword = true;
 			prev_keyword = upper;

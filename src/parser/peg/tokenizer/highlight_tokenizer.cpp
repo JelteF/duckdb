@@ -10,11 +10,10 @@ void HighlightTokenizerBehavior::PushToken(idx_t start, idx_t end, TokenType typ
 	if (start >= end) {
 		return;
 	}
-	string last_token = sql.substr(start, end - start);
-	tokens.emplace_back(std::move(last_token), start, type, unterminated);
+	tokens.emplace_back(sql.data() + start, end - start, start, type, unterminated);
 }
 
 void HighlightTokenizerBehavior::OnStatementEnd(idx_t pos) {
-	tokens.emplace_back(";", pos, TokenType::TERMINATOR);
+	tokens.emplace_back(";", 1, pos, TokenType::TERMINATOR);
 }
 } // namespace duckdb

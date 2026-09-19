@@ -40,7 +40,8 @@ shared_ptr<CompiledGrammar> DialectExtension::GetCompiledGrammar(const ClientCon
 	compiled_rules_map_t rules;
 	for (auto &entry : parsed_grammar.rules) {
 		auto &rule = *entry.second;
-		rules.emplace(rule.name, make_uniq<CompiledGrammarRule>(rule.name, rule.transform_process));
+		rules.emplace(rule.name, make_uniq<CompiledGrammarRule>(rule.name, rule.transform_process, rule.generated_ops,
+		                                                        rule.childless_transform));
 	}
 	auto terminal_rule_overrides = parsed_grammar.BuildTerminalRuleOverrides(*keyword_helper);
 	CreateMatcherFactoryInput matcher_factory_input {allocator, parsed_grammar, rules, *keyword_helper,
@@ -49,10 +50,12 @@ shared_ptr<CompiledGrammar> DialectExtension::GetCompiledGrammar(const ClientCon
 
 	auto &program_matcher = matcher_factory->CreateRootMatcher("Program");
 	auto &top_level_statement_matcher = matcher_factory->GetMatcher("TopLevelStatement");
+	allocator.ComputeStartSets();
+	matcher_factory->IndexStartSets();
 
-	auto result = shared_ptr<CompiledGrammar>(new CompiledGrammar(std::move(allocator), std::move(keyword_helper),
-	                                                              std::move(tokenizer), std::move(rules),
-	                                                              program_matcher, top_level_statement_matcher));
+	auto result = shared_ptr<CompiledGrammar>(
+	    new CompiledGrammar(std::move(allocator), std::move(keyword_helper), std::move(tokenizer), std::move(rules),
+	                        program_matcher, top_level_statement_matcher, matcher_factory->PackratMatcherCount()));
 
 	lock_guard<mutex> guard(lock);
 	if (!cache) {

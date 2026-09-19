@@ -36,7 +36,8 @@ public:
 public:
 	virtual void PushToken(idx_t start, idx_t end, TokenType type, bool unterminated = false);
 	virtual void OnStatementEnd(idx_t pos);
-	virtual void OnLastToken(const Tokenizer &tokenizer, TokenizeState state, string last_word, idx_t last_pos);
+	virtual void OnLastToken(const Tokenizer &tokenizer, TokenizeState state, std::string_view last_word,
+	                         idx_t last_pos);
 
 	//! Sentinel appended at the end of the token vector on a clean exit. Override to return
 	//! `END_OF_INPUT_AUTOCOMPLETE` for autocomplete behavior. Dirty exits (unterminated comment /
@@ -61,6 +62,9 @@ public:
 	//! Tokenize the behavior's input and return whether autocomplete can be offered.
 	virtual bool TokenizeInput(TokenizerBehavior &behavior) const;
 
+	//! Used to size the token vector up front
+	static constexpr idx_t AVERAGE_TOKEN_LENGTH = 4;
+
 protected:
 	virtual bool BackslashEscapesStringLiterals() const;
 	virtual bool IsQuotedIdentifierDelimiter(char character) const;
@@ -78,7 +82,13 @@ private:
 public:
 	bool IsSpecialOperator(const string &sql, idx_t pos, idx_t &op_len) const;
 	static bool IsSingleByteOperator(char c);
-	static bool CharacterIsInitialNumber(char c);
+	//! Inline: asked for most characters of the query, where the call costs more than the comparison
+	static bool CharacterIsInitialNumber(char c) {
+		if (c >= '0' && c <= '9') {
+			return true;
+		}
+		return c == '.';
+	}
 	static bool CharacterIsNumber(char c);
 	static bool CharacterIsScientific(char c);
 	static bool CharacterIsControlFlow(char c);

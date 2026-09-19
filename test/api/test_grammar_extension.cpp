@@ -32,7 +32,8 @@ static compiled_rules_map_t CompileTestProgramRule(const ParsedGrammar &grammar)
 	if (!rule) {
 		throw InternalException("Test grammar is missing the Program rule");
 	}
-	rules.emplace(rule->name, make_uniq<CompiledGrammarRule>(rule->name, rule->transform_process));
+	rules.emplace(rule->name, make_uniq<CompiledGrammarRule>(rule->name, rule->transform_process, rule->generated_ops,
+	                                                       rule->childless_transform));
 	return rules;
 }
 
@@ -75,12 +76,12 @@ TEST_CASE("Literal choice dispatch retains autocomplete metadata", "[api][gramma
 static LiteralChoiceTestResult MatchLiteralChoiceTest(const Matcher &matcher, const string &text, MatchMode mode) {
 	vector<MatcherToken> tokens;
 	if (!text.empty()) {
-		tokens.emplace_back(text, 0, TokenType::KEYWORD);
+		tokens.emplace_back(text.c_str(), text.size(), 0, TokenType::KEYWORD);
 	}
 	TokenIterator iterator(tokens);
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator allocator;
-	ParserPackratCache packrat;
+	ParserPackratCache packrat(0, tokens.size(), 0);
 	idx_t max_position = 0;
 	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
 	MatchContext context(suggestions, allocator, process_allocator, max_position, mode,
@@ -105,7 +106,7 @@ TEST_CASE("Literal choice dispatch preserves ordered choice results", "[api][gra
 	REQUIRE(table);
 	REQUIRE(choice.matchers[0].get().Cast<KeywordMatcher>().GetDispatchLiteral(*table).IsValid());
 	for (auto &text : vector<string> {"WHERE", "unknown_literal"}) {
-		vector<MatcherToken> tokens {MatcherToken(text, 0, TokenType::KEYWORD)};
+		vector<MatcherToken> tokens {MatcherToken(text.c_str(), text.size(), 0, TokenType::KEYWORD)};
 		TokenIterator iterator(tokens);
 		vector<MatcherSuggestion> suggestions;
 		ParseResultAllocator parse_results;
@@ -114,12 +115,12 @@ TEST_CASE("Literal choice dispatch preserves ordered choice results", "[api][gra
 		MatchContext context(suggestions, parse_results, process_allocator, max_position);
 		MatchState state(iterator, context);
 		auto process = choice.StartMatch(state);
-		auto step = process->Resume(nullopt);
+		auto step = process->Resume(nullptr);
 		if (text == "WHERE") {
-			REQUIRE(step.GetChild());
-			REQUIRE(&step.GetChild()->matcher == &choice.matchers[3].get());
+			REQUIRE(step.HasChild());
+			REQUIRE(&step.GetChild().matcher == &choice.matchers[3].get());
 		} else {
-			REQUIRE_FALSE(step.GetChild());
+			REQUIRE_FALSE(step.HasChild());
 			REQUIRE_FALSE(step.GetResult().IsSuccess());
 		}
 	}
@@ -145,7 +146,7 @@ public:
 	MatcherResult MatchAtomic(MatchState &state) const override {
 		calls++;
 		auto token = state.token_iterator.Current();
-		if (accepts_from && token && StringUtil::CIEquals(token->text, "FROM")) {
+		if (accepts_from && token && StringUtil::CIEquals(token->text.data(), token->text.size(), "FROM", 4)) {
 			state.token_iterator.Advance();
 			return MatcherResult::Success();
 		}
@@ -292,8 +293,8 @@ TEST_CASE("Token literal caches follow grammar identity and token edits", "[api]
 	GrammarLiteralTable first(grammar, first_categories);
 	optional<GrammarLiteralTable> second;
 	second.emplace(grammar, second_categories);
-	vector<MatcherToken> tokens {MatcherToken("select", 0, TokenType::KEYWORD),
-	                             MatcherToken("extension_word", 7, TokenType::IDENTIFIER)};
+	vector<MatcherToken> tokens {MatcherToken("select", 6, 0, TokenType::KEYWORD),
+	                             MatcherToken("extension_word", 14, 7, TokenType::IDENTIFIER)};
 	TokenIterator iterator(tokens);
 	REQUIRE(iterator.CurrentLiteralInfo(first).HasCategory(PEGKeywordCategory::KEYWORD_RESERVED));
 	TokenIterator branch(iterator);
@@ -334,7 +335,7 @@ public:
 };
 
 static bool MatchLiteralTestToken(const Matcher &matcher, const string &text) {
-	vector<MatcherToken> tokens {MatcherToken(text, 0, TokenType::IDENTIFIER)};
+	vector<MatcherToken> tokens {MatcherToken(text.c_str(), text.size(), 0, TokenType::IDENTIFIER)};
 	TokenIterator iterator(tokens);
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator allocator;
@@ -384,10 +385,16 @@ TEST_CASE("Transform result types use stable registered names", "[api][grammar_e
 
 class GrammarExtensionTestValueTransformProcess final : public TransformProcess {
 public:
-	TransformStep Resume(unique_ptr<TransformResultValue> child_result) override {
-		D_ASSERT(!child_result);
-		return TransformStep::Complete(make_uniq<TypedTransformResult<bool>>(true));
+	explicit GrammarExtensionTestValueTransformProcess(PEGTransformer &transformer_p) : transformer(transformer_p) {
 	}
+
+	TransformStep Resume(transform_result_ptr child_result) override {
+		D_ASSERT(!child_result);
+		return TransformStep::Complete(transformer.MakeResult<bool>(true));
+	}
+
+private:
+	PEGTransformer &transformer;
 };
 
 class GrammarExtensionTestTransformProcess final : public TransformProcess {
@@ -396,7 +403,7 @@ public:
 	    : transformer(transformer_p), parse_result(parse_result_p) {
 	}
 
-	TransformStep Resume(unique_ptr<TransformResultValue> child_result) override {
+	TransformStep Resume(transform_result_ptr child_result) override {
 		if (!child_result) {
 			auto &list = parse_result.Cast<ListParseResult>();
 			return TransformStep::Child({transformer.GetRule("GrammarExtensionTestValue"), list.GetChild(0)});
@@ -407,8 +414,7 @@ public:
 		select_node->select_list.push_back(ConstantExpression::Integer(42));
 		select_node->from_table = make_uniq<EmptyTableRef>();
 		statement->node = std::move(select_node);
-		return TransformStep::Complete(
-		    make_uniq<TypedTransformResult<unique_ptr<SelectStatement>>>(std::move(statement)));
+		return TransformStep::Complete(transformer.MakeResult<unique_ptr<SelectStatement>>(std::move(statement)));
 	}
 
 private:
@@ -416,13 +422,13 @@ private:
 	ParseResult &parse_result;
 };
 
-static unique_ptr<TransformProcess> StartGrammarExtensionTestValueTransform(PEGTransformer &, ParseResult &) {
-	return make_uniq<GrammarExtensionTestValueTransformProcess>();
+static arena_ptr<TransformProcess> StartGrammarExtensionTestValueTransform(PEGTransformer &transformer, ParseResult &) {
+	return transformer.MakeProcess<GrammarExtensionTestValueTransformProcess>(transformer);
 }
 
-static unique_ptr<TransformProcess> StartGrammarExtensionTestTransform(PEGTransformer &transformer,
-                                                                       ParseResult &parse_result) {
-	return make_uniq<GrammarExtensionTestTransformProcess>(transformer, parse_result);
+static arena_ptr<TransformProcess> StartGrammarExtensionTestTransform(PEGTransformer &transformer,
+                                                                      ParseResult &parse_result) {
+	return transformer.MakeProcess<GrammarExtensionTestTransformProcess>(transformer, parse_result);
 }
 
 class GrammarExtensionTestMatchProcess final : public MatchProcess {
@@ -431,8 +437,8 @@ public:
 	    : child(child_p), state(state_p), child_state(state_p) {
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
-		D_ASSERT(awaiting_child == child_result.has_value());
+	MatchStep Resume(const MatcherResult *child_result) override {
+		D_ASSERT(awaiting_child == (child_result != nullptr));
 		if (!child_result) {
 			awaiting_child = true;
 			return MatchStep::Child({child, child_state});
@@ -526,7 +532,7 @@ TEST_CASE("Literal caches respect active grammar extensions", "[api][grammar_ext
 	auto base = CompiledGrammar::Get(*con.context);
 	auto base_table = base->GetKeywordHelper().GetLiteralTable();
 	REQUIRE(base_table);
-	vector<MatcherToken> tokens {MatcherToken("answer", 0, TokenType::IDENTIFIER)};
+	vector<MatcherToken> tokens {MatcherToken("answer", 6, 0, TokenType::IDENTIFIER)};
 	TokenIterator iterator(tokens);
 	REQUIRE(iterator.CurrentLiteralInfo(*base_table).LiteralId() == 0);
 	RegisterGrammarExtensionTestSyntax(*db.instance);
@@ -585,7 +591,7 @@ public:
 		lifetime.active--;
 	}
 
-	MatchStep Resume(optional<MatcherResult> child_result) override {
+	MatchStep Resume(const MatcherResult *child_result) override {
 		if (child_result) {
 			if (depth == 1 && ++completed_children < lifetime.root_children) {
 				return MatchStep::Child({matcher, child_state});
@@ -602,8 +608,9 @@ public:
 			return MatchStep::Complete(MatcherResult::Failure());
 		}
 		if (lifetime.create_result) {
+			static const string NESTED_RESULT_NAME = "nested result";
 			return MatchStep::Complete(child_state.AllocateParseResult<ListParseResult>(
-			    vector<reference<ParseResult>>(), string("nested result"), optional_idx()));
+			    ParseResultChildren(), &NESTED_RESULT_NAME, optional_idx()));
 		}
 		return MatchStep::Complete(MatcherResult::Success());
 	}
@@ -664,7 +671,7 @@ TEST_CASE("Matcher stack vector growth preserves custom process lifetimes", "[ap
 			auto result = stack.Execute({matcher, state});
 			REQUIRE(result.IsSuccess());
 			REQUIRE(result.HasParseResult());
-			REQUIRE(result.GetParseResult()->name == "nested result");
+			REQUIRE(result.GetParseResult()->Name() == "nested result");
 			REQUIRE(lifetime.active == 0);
 			REQUIRE(lifetime.state_valid);
 			REQUIRE(lifetime.started == depth);
@@ -894,7 +901,7 @@ TEST_CASE("Packrat results outlive reset process arenas", "[api][grammar_extensi
 	TokenIterator iterator(tokens);
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator parse_results;
-	ParserPackratCache cache;
+	ParserPackratCache cache(0, tokens.size(), 1);
 	idx_t max_token_index = 0;
 	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
 	MatchContext context(suggestions, parse_results, process_allocator, max_token_index);
@@ -905,7 +912,7 @@ TEST_CASE("Packrat results outlive reset process arenas", "[api][grammar_extensi
 	lifetime.create_result = true;
 	MatcherAllocator matchers;
 	auto &matcher = matchers.Allocate(make_uniq<ArenaNestedTestMatcher>(lifetime));
-	matcher.SetPackratMemoized();
+	matcher.SetPackratMemoized(0);
 	MatchStack stack;
 
 	SECTION("Cached successes retain separately allocated parse results") {
@@ -934,7 +941,7 @@ TEST_CASE("Packrat results outlive reset process arenas", "[api][grammar_extensi
 	REQUIRE(lifetime.state_valid);
 	if (cached.IsSuccess()) {
 		REQUIRE(cached.HasParseResult());
-		REQUIRE(cached.GetParseResult()->name == "nested result");
+		REQUIRE(cached.GetParseResult()->Name() == "nested result");
 	}
 }
 

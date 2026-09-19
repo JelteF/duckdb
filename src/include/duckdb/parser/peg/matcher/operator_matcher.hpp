@@ -25,7 +25,7 @@ public:
 		if (!MatchOperator(state)) {
 			return MatcherResult::Failure();
 		}
-		return state.AllocateParseResult<OperatorParseResult>(token_text, start_offset, token_length);
+		return state.AllocateParseResult<OperatorParseResult>(string {token_text}, start_offset, token_length);
 	}
 
 	SuggestionType AddSuggestionInternal(MatchState &state) const override {
@@ -36,8 +36,21 @@ public:
 		return "OPERATOR";
 	}
 
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		return OperatorMatches(state);
+	}
+
 private:
 	bool MatchOperator(MatchState &state) const {
+		if (!OperatorMatches(state)) {
+			return false;
+		}
+		state.token_iterator.Advance();
+		state.UpdateMaxTokenIndex();
+		return true;
+	}
+
+	bool OperatorMatches(MatchState &state) const {
 		auto token = state.token_iterator.Current();
 		if (!token) {
 			return false;
@@ -66,8 +79,6 @@ private:
 				return false;
 			}
 		}
-		state.token_iterator.Advance();
-		state.UpdateMaxTokenIndex();
 		return true;
 	}
 

@@ -46,7 +46,7 @@
 # ---------------------------------------------------------------------------
 
 additional_transform_result_types:
-  - "unique_ptr<TransformResultValue>"
+  - "transform_result_ptr"
   - "vector<Identifier>"
 
 SQLStatementList:
@@ -1803,21 +1803,35 @@ matcher_rule_overrides:
     allow_type_overlap: true
     matcher: operator
 
-packrat_memoized_rules:
+# collapsible_rules: rules of the form `X <- Y`, `X <- Y Tail*`, `X <- Y Tail?` or `X <- Prefix? Y`
+# whose transformer returns Y's result unchanged when the rest of the rule matched nothing. When such
+# a rule matches only Y, the matcher hands out Y's parse result instead of wrapping it. This is also
+# what lets MatcherFactory::BuildPrecedenceLadder find the operator precedence chain.
+collapsible_rules:
   - Expression
   - LambdaArrowExpression
   - LogicalOrExpression
   - LogicalAndExpression
   - LogicalNotExpression
   - IsExpression
+  - IsDistinctFromExpression
   - ComparisonExpression
+  - BetweenInLikeExpression
+  - OtherOperatorExpression
   - BitwiseExpression
   - AdditiveExpression
   - MultiplicativeExpression
   - ExponentiationExpression
-  - PrefixExpression
   - CollateExpression
   - AtTimeZoneExpression
+  - PrefixExpression
+  - BaseExpression
+
+# The levels of the operator precedence ladder are deliberately not here: they form a chain that is
+# entered once per operand position rather than a rule several ordered choices re-enter at the same
+# token, so memoizing them cost a lookup and a store per level per operand for a hit rate of two in
+# a thousand.
+packrat_memoized_rules:
   - SingleExpression
   - BaseExpression
   - ParensExpression
@@ -1826,6 +1840,7 @@ packrat_memoized_rules:
   - ColId
   - ColumnReference
   - FunctionExpression
+  - Expression
 
 # ---------------------------------------------------------------------------
 # excluded_rules: no transformer stub generated, no semantic value extracted

@@ -221,6 +221,17 @@ void ParsedGrammar::SetTransformProcess(const string &rule_name,
                                         grammar_transform_process_function_t transform_process) {
 	auto &rule = GetMutableRule(rule_name);
 	rule.transform_process = std::move(transform_process);
+	// an explicitly registered process replaces the generated one
+	rule.generated_ops = nullptr;
+	rule.childless_transform = false;
+}
+
+void ParsedGrammar::SetGeneratedTransformOps(const string &rule_name, const TransformFrameOps &ops) {
+	GetMutableRule(rule_name).generated_ops = ops;
+}
+
+void ParsedGrammar::SetChildlessTransform(const string &rule_name) {
+	GetMutableRule(rule_name).childless_transform = true;
 }
 
 void ParsedGrammar::AddTerminalRuleOverride(const string &rule_name, terminal_rule_matcher_factory_t matcher_factory) {
