@@ -233,6 +233,9 @@ bool Tokenizer::IsUnterminatedState(TokenizeState state) {
 bool Tokenizer::TokenizeInput(TokenizerBehavior &behavior) const {
 	auto &sql = behavior.sql;
 	auto &tokens = behavior.tokens;
+	// SQL averages a few characters per token, so this is close enough to hold the whole input without the vector
+	// growing, which would move every token built so far
+	tokens.reserve(sql.size() / AVERAGE_TOKEN_LENGTH + 1);
 	if (TokenizeInputInternal(behavior)) {
 		auto terminator = behavior.GetTerminator();
 		tokens.emplace_back("", sql.size(), terminator);
