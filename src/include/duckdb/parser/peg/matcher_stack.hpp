@@ -19,7 +19,16 @@ struct PackratMatchState {
 	}
 
 	optional<MatcherResult> TryLoadCachedResult(const Matcher &matcher, MatchState &state);
-	void StoreResult(const Matcher &matcher, MatchState &state, const MatcherResult &result) const;
+	//! Inline: every frame calls this, but only the memoized rules have anything to store
+	void StoreResult(const Matcher &matcher, MatchState &state, const MatcherResult &result) const {
+		if (!token_index_before.IsValid()) {
+			return;
+		}
+		StoreResultInternal(matcher, state, result);
+	}
+
+private:
+	void StoreResultInternal(const Matcher &matcher, MatchState &state, const MatcherResult &result) const;
 
 private:
 	optional_idx token_index_before;
