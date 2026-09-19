@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
 #include "duckdb/parser/peg/matcher.hpp"
@@ -16,21 +18,21 @@ public:
 	      literal_table(keyword_helper_p.GetLiteralTable()) {
 	}
 
-	bool IsQuoted(const string &text) const {
+	bool IsQuoted(std::string_view text) const {
 		if (text.front() == '"' && text.back() == '"') {
 			return true;
 		}
 		return false;
 	}
 
-	bool IsSingleQuoted(const string &text) const {
+	bool IsSingleQuoted(std::string_view text) const {
 		if (text.front() == '\'' && text.back() == '\'') {
 			return true;
 		}
 		return false;
 	}
 
-	bool IsIdentifier(const string &text) const {
+	bool IsIdentifier(std::string_view text) const {
 		if (text.empty()) {
 			return false;
 		}
@@ -62,7 +64,7 @@ public:
 			return MatcherResult::Success();
 		}
 
-		string result_text = token_text;
+		string result_text {token_text};
 		if (IsQuoted(result_text)) {
 			result_text = result_text.substr(1, result_text.size() - 2);
 			result_text = StringUtil::Replace(result_text, "\"\"", "\"");
@@ -160,19 +162,20 @@ public:
 	}
 
 private:
-	bool IsAllowedKeyword(TokenIterator &tokens, const string &token_text) const {
+	bool IsAllowedKeyword(TokenIterator &tokens, std::string_view token_text) const {
 		if (literal_table) {
 			auto literal_info = tokens.CurrentLiteralInfo(*literal_table);
 			return !literal_info.IsKeyword() || literal_info.HasCategory(PEGKeywordCategory::KEYWORD_UNRESERVED) ||
 			       literal_info.HasCategory(GetAllowedCategory());
 		}
-		if (!keyword_helper.IsKeyword(token_text)) {
+		auto text = string(token_text);
+		if (!keyword_helper.IsKeyword(text)) {
 			return true;
 		}
-		if (keyword_helper.KeywordCategoryType(token_text, PEGKeywordCategory::KEYWORD_UNRESERVED)) {
+		if (keyword_helper.KeywordCategoryType(text, PEGKeywordCategory::KEYWORD_UNRESERVED)) {
 			return true;
 		}
-		return keyword_helper.KeywordCategoryType(token_text, GetAllowedCategory());
+		return keyword_helper.KeywordCategoryType(text, GetAllowedCategory());
 	}
 
 	bool CanStartWith(MatchState &state, idx_t depth) const override {
@@ -223,7 +226,7 @@ public:
 		if (!state.BuildParseResult()) {
 			return MatcherResult::Success();
 		}
-		string result_text = token_text;
+		string result_text {token_text};
 		// unlike IdentifierMatcher this rule does not unwrap path literals, it only has to avoid folding them
 		const bool is_path_literal = IsSingleQuoted(result_text) && SupportsStringLiteral();
 		if (IsQuoted(result_text)) {
