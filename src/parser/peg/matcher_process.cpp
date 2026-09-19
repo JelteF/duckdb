@@ -614,6 +614,10 @@ class RepeatMatchProcess : public MatchProcess {
 public:
 	RepeatMatchProcess(const RepeatMatcher &matcher_p, MatchState &state_p)
 	    : matcher(matcher_p), state(state_p), repeat_state(state_p), results(state_p, 0) {
+		// auto-completion needs the suggestions that the element's own failing children produce
+		if (!repeat_state.token_iterator.HasAutocompleteCursor()) {
+			fused_element = matcher_p.GetFusedElement();
+		}
 		if (auto current = repeat_state.token_iterator.Current()) {
 			start_offset = optional_idx(current->offset);
 		}
@@ -630,7 +634,14 @@ public:
 				return MatchStep::Complete(CreateResult());
 			}
 			matched_once = true;
-			if (child_result->HasParseResult()) {
+			if (fused_element) {
+				// the child is the element's second matcher, so the element's own result is built here
+				auto element_result = BuildFusedElement(*child_result);
+				if (element_result) {
+					results.Add(*element_result);
+				}
+				repeat_state.token_iterator.SetPosition(element_state.value().token_iterator);
+			} else if (child_result->HasParseResult()) {
 				results.Add(*child_result->GetParseResult());
 			}
 			state.token_iterator.SetPosition(repeat_state.token_iterator);
@@ -646,11 +657,51 @@ public:
 			}
 			return MatchStep::Complete(CreateResult());
 		}
+		if (fused_element) {
+			return StartFusedElement();
+		}
 		awaiting_child = true;
 		return MatchStep::Child({matcher.GetChildMatcher(), repeat_state});
 	}
 
 private:
+	//! Match the element's leading atom here, then ask for the rest of it. Saves the element a frame, a match process
+	//! and a state copy per repetition, which for a comma separated list is one per item.
+	MatchStep StartFusedElement() {
+		element_state.emplace(repeat_state);
+		element_state->rule = nullptr;
+		if (auto current = element_state->token_iterator.Current()) {
+			element_offset = optional_idx(current->offset);
+		}
+		auto &lead = fused_element->matchers[0].get();
+		lead_result = static_cast<const AtomicMatcher &>(lead).MatchAtomic(*element_state);
+		if (!lead_result.IsSuccess()) {
+			if (!matched_once) {
+				return MatchStep::Complete(MatcherResult::Failure());
+			}
+			return MatchStep::Complete(CreateResult());
+		}
+		awaiting_child = true;
+		return MatchStep::Child({fused_element->matchers[1].get(), *element_state});
+	}
+
+	//! The list result the element's own frame would have built: its matched children, in order. A run that builds
+	//! no parse results has neither.
+	optional_ptr<ParseResult> BuildFusedElement(const MatcherResult &tail_result) {
+		auto lead = lead_result.GetParseResult();
+		auto tail = tail_result.GetParseResult();
+		ParseResultChildren element_children;
+		if (lead && tail) {
+			reference<ParseResult> children[2] = {*lead, *tail};
+			element_children = element_state->context.allocator.MakeChildren(children, 2);
+		} else if (lead || tail) {
+			reference<ParseResult> children[1] = {lead ? *lead : *tail};
+			element_children = element_state->context.allocator.MakeChildren(children, 1);
+		}
+		return element_state->AllocateParseResult<ListParseResult>(element_children, nullptr, element_offset)
+		    .GetParseResult();
+	}
+
 	MatcherResult CreateResult() {
 		return state.AllocateParseResult<RepeatParseResult>(results.Finalize(state), start_offset);
 	}
@@ -660,6 +711,11 @@ private:
 	MatchState &state;
 	MatchState repeat_state;
 	ChildCollector results;
+	//! Set when the element is matched in this frame rather than one of its own
+	optional_ptr<const ListMatcher> fused_element;
+	optional<MatchState> element_state;
+	MatcherResult lead_result = MatcherResult::Failure();
+	optional_idx element_offset;
 	bool matched_once = false;
 	optional_idx start_offset;
 	bool awaiting_child = false;
