@@ -353,10 +353,10 @@ public:
 		if (state.token_iterator.HasAutocompleteCursor() && token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
 			return true;
 		}
-		auto set = start_set.get();
-		if (!set) {
+		if (!start_set_computed) {
 			return CanStartWith(state, 0);
 		}
+		auto set = &start_set;
 		if (set->any) {
 			return true;
 		}
@@ -382,7 +382,7 @@ public:
 	}
 	//! The tokens this matcher can start with, or null before MatcherAllocator::ComputeStartSets ran
 	optional_ptr<const MatcherStartSet> GetStartSet() const {
-		return start_set;
+		return start_set_computed ? optional_ptr<const MatcherStartSet>(start_set) : nullptr;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;
@@ -457,7 +457,10 @@ protected:
 	optional_ptr<const CompiledGrammarRule> rule;
 	//! See MatcherStartSet; null until MatcherAllocator::ComputeStartSets ran (MayMatchHere then falls back to the
 	//! matcher's own CanStartWith)
-	optional_ptr<const MatcherStartSet> start_set;
+	//! Held by value rather than behind a pointer: the check that reads it runs 24,684 times per statement, and what
+	//! that check waits on is the chain of loads to reach the bits, not the size of a matcher.
+	MatcherStartSet start_set;
+	bool start_set_computed = false;
 	bool nullable = false;
 };
 

@@ -254,6 +254,7 @@ void MatcherAllocator::ComputeStartSets() {
 		set.leaders = start_set_leaders.data() + leader_offsets[i];
 		set.leader_count = NumericCast<uint32_t>(leader_counts[i]);
 		matchers[i]->start_set = set;
+		matchers[i]->start_set_computed = true;
 	}
 }
 
