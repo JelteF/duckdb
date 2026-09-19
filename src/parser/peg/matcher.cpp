@@ -84,8 +84,7 @@ class StartSetBuilder {
 public:
 	struct Entry {
 		unique_ptr<MatcherStartSet> set;
-		//! Literal ids as a bitmap while building, so that merging up the graph is a word-wise OR rather than a
-		//! sort of ever larger id lists; converted to the sorted list in Finalize
+		//! Literal ids as a bitmap, so that merging up the graph is a word-wise OR. The finished set keeps it.
 		vector<uint64_t> literal_bits;
 		bool nullable = false;
 		bool in_progress = false;
@@ -154,16 +153,8 @@ public:
 			set->any = true;
 			break;
 		}
-		for (idx_t word = 0; word < entry.literal_bits.size(); word++) {
-			auto bits = entry.literal_bits[word];
-			while (bits) {
-				auto bit = static_cast<idx_t>(__builtin_ctzll(bits));
-				auto literal_id = static_cast<uint16_t>(word * 64 + bit);
-				set->literal_ids.push_back(literal_id);
-				set->literal_signature |= MatcherStartSet::SignatureBit(literal_id);
-				bits &= bits - 1;
-			}
-		}
+		// copied, not moved: the entry is memoized and later parents still merge its bits
+		set->literal_bits = entry.literal_bits;
 		entry.set = std::move(set);
 		entry.nullable = nullable;
 		entry.in_progress = false;

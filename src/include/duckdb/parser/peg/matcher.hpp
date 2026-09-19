@@ -16,9 +16,8 @@
 #include "duckdb/common/enums/identifier_case_mode.hpp"
 #include "duckdb/parser/parser_extension.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
+#include "duckdb/common/bit_utils.hpp"
 #include "duckdb/parser/token_iterator.hpp"
-
-#include <algorithm>
 #include "duckdb/parser/peg/parser_packrat.hpp"
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
 #include "duckdb/parser/peg/parsed_grammar.hpp"
@@ -295,16 +294,31 @@ struct MatcherStartSet {
 	//! Anything may start this matcher (custom or untyped atomic matchers, or a cycle in the grammar): never prune
 	bool any = false;
 	optional_ptr<const GrammarLiteralTable> literal_table;
-	//! Sorted literal ids of the keywords that can start the matcher
-	vector<uint16_t> literal_ids;
-	//! `literal_ids` folded into 64 buckets. A literal whose bucket is clear is certainly not in the set, which
-	//! answers the common case - the token is not one this matcher starts with - without searching the list.
-	uint64_t literal_signature = 0;
+	//! One bit per literal id that can start the matcher. The grammar numbers its literals densely, so an id indexes
+	//! this directly: the answer is exact and takes one test, where a sorted list took a search and a bloom filter
+	//! to keep the common miss cheap.
+	vector<uint64_t> literal_bits;
 	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
 	vector<reference<const Matcher>> predicate_leaders;
 
-	static uint64_t SignatureBit(uint16_t literal_id) {
-		return uint64_t(1) << (literal_id & 63);
+	bool HasLiteral(uint16_t literal_id) const {
+		auto word = static_cast<idx_t>(literal_id) / 64;
+		if (word >= literal_bits.size()) {
+			return false;
+		}
+		return (literal_bits[word] & (uint64_t(1) << (literal_id % 64))) != 0;
+	}
+
+	template <class FUNC>
+	void ForEachLiteral(FUNC &&callback) const {
+		for (idx_t word = 0; word < literal_bits.size(); word++) {
+			auto bits = literal_bits[word];
+			while (bits) {
+				auto bit = CountZeros<uint64_t>::Trailing(bits);
+				callback(static_cast<uint16_t>(word * 64 + bit));
+				bits &= bits - 1;
+			}
+		}
 	}
 };
 
@@ -342,10 +356,9 @@ public:
 		if (set->any) {
 			return true;
 		}
-		if (!set->literal_ids.empty()) {
+		if (!set->literal_bits.empty()) {
 			auto literal_id = state.token_iterator.CurrentLiteralInfo(*set->literal_table).LiteralId();
-			if (literal_id && (set->literal_signature & MatcherStartSet::SignatureBit(literal_id)) &&
-			    std::binary_search(set->literal_ids.begin(), set->literal_ids.end(), literal_id)) {
+			if (literal_id && set->HasLiteral(literal_id)) {
 				return true;
 			}
 		}

@@ -289,12 +289,12 @@ static void BuildLadderLevelMasks(PrecedenceLadder &ladder) {
 		if (start_set->literal_table) {
 			ladder.literal_table = start_set->literal_table;
 		}
-		for (auto literal_id : start_set->literal_ids) {
+		start_set->ForEachLiteral([&](uint16_t literal_id) {
 			if (literal_id >= ladder.literal_levels.size()) {
 				ladder.literal_levels.resize(literal_id + 1, 0);
 			}
 			ladder.literal_levels[literal_id] |= level_bit;
-		}
+		});
 	}
 }
 
