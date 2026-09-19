@@ -280,7 +280,7 @@ static void BuildLadderLevelMasks(PrecedenceLadder &ladder) {
 		}
 		auto level_bit = uint32_t(1) << level;
 		auto start_set = entry.affix->GetStartSet();
-		if (!start_set || start_set->any || !start_set->predicate_leaders.empty()) {
+		if (!start_set || start_set->any || start_set->leader_count != 0) {
 			ladder.predicate_levels |= level_bit;
 		}
 		if (!start_set) {
@@ -289,12 +289,12 @@ static void BuildLadderLevelMasks(PrecedenceLadder &ladder) {
 		if (start_set->literal_table) {
 			ladder.literal_table = start_set->literal_table;
 		}
-		for (auto literal_id : start_set->literal_ids) {
+		start_set->ForEachLiteral([&](uint16_t literal_id) {
 			if (literal_id >= ladder.literal_levels.size()) {
 				ladder.literal_levels.resize(literal_id + 1, 0);
 			}
 			ladder.literal_levels[literal_id] |= level_bit;
-		}
+		});
 	}
 }
 
