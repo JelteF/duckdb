@@ -323,6 +323,33 @@ void MatcherFactory::FuseSingleChoiceRules() {
 	}
 }
 
+void MatcherAllocator::FuseRepeatElements() {
+	for (auto &entry : matchers) {
+		auto &matcher = *entry;
+		if (matcher.Type() != MatcherType::REPEAT) {
+			continue;
+		}
+		auto &repeat = matcher.Cast<RepeatMatcher>();
+		auto &element = repeat.GetChildMatcher();
+		if (element.Type() != MatcherType::LIST) {
+			continue;
+		}
+		auto &list = element.Cast<ListMatcher>();
+		// `(Atom X)` only: the repeat matches the atom itself and asks for X, so the element needs no frame. Anything
+		// the element's own frame would have done besides that - a rule, a name, a ladder, memoization, hidden
+		// suggestions - keeps it.
+		if (list.matchers.size() != 2 || list.GetRule() || list.HasName() || list.GetLadder() ||
+		    list.GetFusedChoice() || list.suppress_suggestions || list.IsPackratMemoized() || list.IsCollapsible()) {
+			continue;
+		}
+		auto &lead = list.matchers[0].get();
+		if (!lead.IsAtomic() || lead.IsPackratMemoized()) {
+			continue;
+		}
+		repeat.SetFusedElement(list);
+	}
+}
+
 void MatcherFactory::BuildPrecedenceLadder(const string &root_rule) {
 	auto entry = matchers.find(root_rule);
 	if (entry == matchers.end() || entry->second.get().Type() != MatcherType::LIST) {
@@ -537,6 +564,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	}
 	BuildPrecedenceLadder("Expression");
 	FuseSingleChoiceRules();
+	allocator.FuseRepeatElements();
 	return GetMatcher(root_rule);
 }
 
