@@ -33,7 +33,7 @@ public:
 		if (!MatchKeyword(state)) {
 			return MatcherResult::Failure();
 		}
-		auto result = state.AllocateParseResult<KeywordParseResult>(token_text, start_offset, token_length);
+		auto result = state.AllocateParseResult<KeywordParseResult>(string {token_text}, start_offset, token_length);
 		if (result.HasParseResult()) {
 			result.GetParseResult()->SetName(name);
 		}
@@ -74,8 +74,9 @@ private:
 		if (!token) {
 			return false;
 		}
-		return literal_table ? state.token_iterator.CurrentLiteralInfo(*literal_table) == literal_info
-		                     : StringUtil::CIEquals(keyword, token->text);
+		return literal_table
+		           ? state.token_iterator.CurrentLiteralInfo(*literal_table) == literal_info
+		           : StringUtil::CIEquals(keyword.c_str(), keyword.size(), token->text.data(), token->text.size());
 	}
 
 	bool MatchKeyword(MatchState &state) const {

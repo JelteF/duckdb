@@ -586,7 +586,8 @@ static duckdb::unique_ptr<FunctionData> CheckPEGParserBind(ClientContext &contex
 			if (i < 10) {
 				token_list += " ";
 			}
-			token_list += to_string(i) + ":" + root_tokens[i].text;
+			token_list += to_string(i) + ":";
+			token_list += root_tokens[i].text;
 		}
 		throw BinderException(
 		    "Failed to parse query \"%s\" - did not consume all tokens (got to token %d - %s)\nTokens:\n%s", sql,

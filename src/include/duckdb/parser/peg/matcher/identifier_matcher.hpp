@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
 #include "duckdb/parser/peg/matcher.hpp"
@@ -16,21 +18,21 @@ public:
 	      identifier_mask(keyword_helper_p.GetIdentifierMask(suggestion_type)) {
 	}
 
-	bool IsQuoted(const string &text) const {
+	bool IsQuoted(std::string_view text) const {
 		if (text.front() == '"' && text.back() == '"') {
 			return true;
 		}
 		return false;
 	}
 
-	bool IsSingleQuoted(const string &text) const {
+	bool IsSingleQuoted(std::string_view text) const {
 		if (text.front() == '\'' && text.back() == '\'') {
 			return true;
 		}
 		return false;
 	}
 
-	bool IsIdentifier(const string &text) const {
+	bool IsIdentifier(std::string_view text) const {
 		if (text.empty()) {
 			return false;
 		}
@@ -62,7 +64,7 @@ public:
 			return MatcherResult::Success();
 		}
 
-		string result_text = token_text;
+		string result_text {token_text};
 		if (IsQuoted(result_text)) {
 			result_text = result_text.substr(1, result_text.size() - 2);
 			result_text = StringUtil::Replace(result_text, "\"\"", "\"");
@@ -201,7 +203,7 @@ public:
 		if (!state.BuildParseResult()) {
 			return MatcherResult::Success();
 		}
-		string result_text = token_text;
+		string result_text {token_text};
 		// unlike IdentifierMatcher this rule does not unwrap path literals, it only has to avoid folding them
 		const bool is_path_literal = IsSingleQuoted(result_text) && SupportsStringLiteral();
 		if (IsQuoted(result_text)) {

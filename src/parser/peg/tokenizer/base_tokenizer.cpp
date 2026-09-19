@@ -20,8 +20,7 @@ bool Tokenizer::IsQuotedIdentifierDelimiter(char character) const {
 
 void Tokenizer::HandleLastToken(TokenizerBehavior &behavior, TokenizeState state, const string &sql,
                                 idx_t last_pos) const {
-	string last_word = sql.substr(last_pos, sql.size() - last_pos);
-	behavior.OnLastToken(*this, state, last_word, last_pos);
+	behavior.OnLastToken(*this, state, std::string_view(sql.data() + last_pos, sql.size() - last_pos), last_pos);
 }
 
 bool Tokenizer::IsCompoundColonToken(const string &sql, idx_t pos, idx_t &token_length) const {
@@ -238,12 +237,12 @@ bool Tokenizer::TokenizeInput(TokenizerBehavior &behavior) const {
 	tokens.reserve(sql.size() / AVERAGE_TOKEN_LENGTH + 1);
 	if (TokenizeInputInternal(behavior)) {
 		auto terminator = behavior.GetTerminator();
-		tokens.emplace_back("", sql.size(), terminator);
+		tokens.emplace_back(sql.data() + sql.size(), 0, sql.size(), terminator);
 		if (terminator == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
 			return true;
 		}
 	} else {
-		tokens.emplace_back("", sql.size(), TokenType::END_OF_INPUT);
+		tokens.emplace_back(sql.data() + sql.size(), 0, sql.size(), TokenType::END_OF_INPUT);
 	}
 	return false;
 }
@@ -272,7 +271,7 @@ void Tokenizer::PushOperatorToken(TokenizerBehavior &behavior, idx_t start, idx_
 	behavior.PushToken(start, end_pos, TokenType::OPERATOR);
 	// Push any trimmed '+' or '-' characters as individual tokens
 	for (idx_t pos = end_pos; pos < end; pos++) {
-		tokens.emplace_back(string(1, sql[pos]), pos, TokenType::OPERATOR);
+		tokens.emplace_back(sql.data() + pos, 1, pos, TokenType::OPERATOR);
 	}
 }
 
@@ -316,7 +315,7 @@ bool Tokenizer::TokenizeInputInternal(TokenizerBehavior &behavior) const {
 				}
 				if (sql[i + 1] >= '0' && sql[i + 1] <= '9') {
 					// $[numeric] is a parameter, not a dollar-quoted string
-					tokens.emplace_back(string(1, c), i, TokenType::OPERATOR);
+					tokens.emplace_back(sql.data() + i, 1, i, TokenType::OPERATOR);
 					break;
 				}
 				// Dollar-quoted string or collabel parameter ($collabel)
@@ -334,7 +333,7 @@ bool Tokenizer::TokenizeInputInternal(TokenizerBehavior &behavior) const {
 				}
 				if (next_dollar == 0) {
 					// Collabel parameter ($collabel)
-					tokens.emplace_back(string(1, c), i, TokenType::OPERATOR);
+					tokens.emplace_back(sql.data() + i, 1, i, TokenType::OPERATOR);
 					break;
 				}
 				state = TokenizeState::DOLLAR_QUOTED_STRING;
@@ -371,14 +370,14 @@ bool Tokenizer::TokenizeInputInternal(TokenizerBehavior &behavior) const {
 					break;
 				}
 				// Push the compound colon token
-				tokens.emplace_back(sql.substr(i, token_length), last_pos, TokenType::OPERATOR);
+				tokens.emplace_back(sql.data() + i, token_length, last_pos, TokenType::OPERATOR);
 				i += token_length - 1;
 				last_pos = i + 1;
 				break;
 			}
 			if (IsSingleByteOperator(c)) {
 				// single-byte operator - directly push the token
-				tokens.emplace_back(string(1, c), last_pos, TokenType::OPERATOR);
+				tokens.emplace_back(sql.data() + i, 1, last_pos, TokenType::OPERATOR);
 				last_pos = i + 1;
 				break;
 			}
@@ -602,16 +601,18 @@ void TokenizerBehavior::OnStatementEnd(idx_t pos) {
 	// Default: Do nothing
 }
 
-void TokenizerBehavior::OnLastToken(const Tokenizer &tokenizer, TokenizeState state, string last_word, idx_t last_pos) {
+void TokenizerBehavior::OnLastToken(const Tokenizer &tokenizer, TokenizeState state, std::string_view last_word,
+                                    idx_t last_pos) {
 	if (last_word.empty()) {
 		return;
 	}
-	if (state == TokenizeState::KEYWORD && !tokenizer.keyword_helper.IsKeyword(last_word)) {
+	if (state == TokenizeState::KEYWORD && !tokenizer.keyword_helper.IsKeyword(string {last_word})) {
 		state = TokenizeState::STANDARD;
 	}
 
 	bool is_unterminated = Tokenizer::IsUnterminatedState(state);
-	tokens.emplace_back(std::move(last_word), last_pos, Tokenizer::TokenizeStateToType(state), is_unterminated);
+	tokens.emplace_back(last_word.data(), last_word.size(), last_pos, Tokenizer::TokenizeStateToType(state),
+	                    is_unterminated);
 }
 
 } // namespace duckdb

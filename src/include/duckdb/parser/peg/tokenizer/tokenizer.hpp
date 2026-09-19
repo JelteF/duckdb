@@ -36,7 +36,8 @@ public:
 public:
 	virtual void PushToken(idx_t start, idx_t end, TokenType type, bool unterminated = false);
 	virtual void OnStatementEnd(idx_t pos);
-	virtual void OnLastToken(const Tokenizer &tokenizer, TokenizeState state, string last_word, idx_t last_pos);
+	virtual void OnLastToken(const Tokenizer &tokenizer, TokenizeState state, std::string_view last_word,
+	                         idx_t last_pos);
 
 	//! Sentinel appended at the end of the token vector on a clean exit. Override to return
 	//! `END_OF_INPUT_AUTOCOMPLETE` for autocomplete behavior. Dirty exits (unterminated comment /
