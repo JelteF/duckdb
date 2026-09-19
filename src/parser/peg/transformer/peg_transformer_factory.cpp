@@ -434,13 +434,19 @@ void PEGTransformerFactory::RegisterDefaultTransforms(ParsedGrammar &grammar) {
 
 vector<reference<ParseResult>> PEGTransformerFactory::ExtractParseResultsFromList(ParseResult &parse_result) {
 	// List(D) <- D (',' D)* ','?
-	vector<reference<ParseResult>> result;
 	auto &list_pr = parse_result.Cast<ListParseResult>();
-	result.push_back(list_pr.GetChild(0));
 	auto &opt_child = list_pr.Child<OptionalParseResult>(1);
+	optional_ptr<RepeatParseResult> tail;
 	if (opt_child.HasResult()) {
-		auto &repeat_result = opt_child.GetResult().Cast<RepeatParseResult>();
-		for (auto &child : repeat_result.GetChildren()) {
+		tail = opt_child.GetResult().Cast<RepeatParseResult>();
+	}
+	vector<reference<ParseResult>> result;
+	// the list is as long as the repeat plus its first element, which a long VALUES row would otherwise reach by
+	// growing a handful of times
+	result.reserve(1 + (tail ? tail->GetChildren().size() : 0));
+	result.push_back(list_pr.GetChild(0));
+	if (tail) {
+		for (auto &child : tail->GetChildren()) {
 			auto &list_child = child.get().Cast<ListParseResult>();
 			result.push_back(list_child.GetChild(1));
 		}
