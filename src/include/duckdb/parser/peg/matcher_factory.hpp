@@ -4,6 +4,7 @@
 #include "duckdb/common/optional.hpp"
 #include "duckdb/common/queue.hpp"
 #include "duckdb/parser/peg/matcher/list.hpp"
+#include "duckdb/parser/peg/matcher/precedence_ladder.hpp"
 
 namespace duckdb {
 struct CompiledGrammar;
@@ -38,6 +39,12 @@ public:
 	Matcher &CreateRootMatcher(const string &root_rule);
 	//! Look up a matcher for a rule that was built by CreateRootMatcher. Throws if the rule has not been built.
 	Matcher &GetMatcher(const string &rule_name);
+	//! Number of memoized matchers created so far
+	idx_t PackratMatcherCount() const {
+		return packrat_matcher_count;
+	}
+	//! Index what the start sets say, which is only possible once MatcherAllocator::ComputeStartSets has run
+	void IndexStartSets();
 
 protected:
 	// Base primitives
@@ -57,6 +64,15 @@ protected:
 	void AddKeywordOverride(const char *name, KeywordInfo keyword_info);
 	void AddRuleOverride(const char *name, unique_ptr<Matcher> &&matcher_p);
 	void AddPackratMemoizedRule(const char *name);
+	//! Find the chain of collapsible rules that starts at `root_rule` and mark its matchers as ladder levels
+	void BuildPrecedenceLadder(const string &root_rule);
+	//! Mark the rules whose whole body is one ordered choice, which are matched without a list frame
+	void FuseSingleChoiceRules();
+	//! Mark a rule of the form `X <- Y Tail*` (or `Prefix* Y`) whose transformer returns Y's result unchanged when no
+	//! tail matched. When such a rule matches only Y, the matcher hands out Y's parse result directly instead of
+	//! wrapping it, and the transformer runs Y's transform on it. The operator precedence ladder is 16 levels of
+	//! these, so for a plain literal this saves 16 parse results, 16 matcher frames and 16 transform frames.
+	void AddCollapsibleRule(const char *name);
 	void SuppressSuggestions(const char *name);
 	Matcher &CreateMatcher(string_t rule_name);
 	Matcher &CreateMatcher(string_t rule_name, vector<reference<Matcher>> &parameters);
@@ -79,6 +95,10 @@ private:
 	case_insensitive_map_t<KeywordInfo> keyword_overrides;
 	string_set_t no_suggestion_rules;
 	string_set_t packrat_memoized_rules;
+	string_set_t collapsible_rules;
+	//! Dense ids handed out to memoized matchers, see Matcher::SetPackratMemoized
+	idx_t packrat_matcher_count = 0;
+	vector<reference<PrecedenceLadder>> ladders;
 };
 
 } // namespace duckdb

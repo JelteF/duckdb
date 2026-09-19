@@ -19,7 +19,16 @@ struct PackratMatchState {
 	}
 
 	optional<MatcherResult> TryLoadCachedResult(const Matcher &matcher, MatchState &state);
-	void StoreResult(const Matcher &matcher, MatchState &state, const MatcherResult &result) const;
+	//! Inline: every frame calls this, but only the memoized rules have anything to store
+	void StoreResult(const Matcher &matcher, MatchState &state, const MatcherResult &result) const {
+		if (!token_index_before.IsValid()) {
+			return;
+		}
+		StoreResultInternal(matcher, state, result);
+	}
+
+private:
+	void StoreResultInternal(const Matcher &matcher, MatchState &state, const MatcherResult &result) const;
 
 private:
 	optional_idx token_index_before;
@@ -28,17 +37,22 @@ private:
 
 struct MatchStackFrame {
 public:
-	explicit MatchStackFrame(MatchInput input);
+	explicit MatchStackFrame(MatchInput input) : matcher(input.matcher), match_state(input.state) {
+	}
 
 public:
-	bool IsInitialized() const;
+	bool IsInitialized() const {
+		return process || has_result;
+	}
 
 public:
 	const Matcher &matcher;
 	MatchState &match_state;
 	arena_ptr<MatchProcess> process;
-	optional<MatcherResult> child_result;
-	optional<MatcherResult> result;
+	MatcherResult child_result = MatcherResult::Failure();
+	MatcherResult result = MatcherResult::Failure();
+	bool has_child_result = false;
+	bool has_result = false;
 	PackratMatchState packrat_state;
 };
 

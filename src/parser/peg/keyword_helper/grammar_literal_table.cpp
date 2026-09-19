@@ -43,16 +43,46 @@ void GrammarLiteralTable::RegisterCategory(const case_insensitive_set_t &words, 
 	}
 }
 
+idx_t GrammarLiteralTable::FindSlot(const char *data, idx_t size) const {
+	const auto mask = entries.size() - 1;
+	auto slot = static_cast<idx_t>(StringUtil::CIHash(data, size)) & mask;
+	while (entries[slot].info.LiteralId()) {
+		auto &entry = entries[slot];
+		if (entry.size == size && StringUtil::CIEquals(entry.data, entry.size, data, size)) {
+			break;
+		}
+		slot = (slot + 1) & mask;
+	}
+	return slot;
+}
+
+void GrammarLiteralTable::Grow() {
+	vector<LiteralEntry> old_entries;
+	old_entries.swap(entries);
+	entries.resize(old_entries.empty() ? INITIAL_CAPACITY : old_entries.size() * 2);
+	for (auto &entry : old_entries) {
+		if (!entry.info.LiteralId()) {
+			continue;
+		}
+		entries[FindSlot(entry.data, entry.size)] = entry;
+	}
+}
+
 void GrammarLiteralTable::Register(const string &text, PEGKeywordCategory category) {
-	auto entry = literals.find(text);
-	if (entry == literals.end()) {
-		if (literals.size() >= LiteralInfo::MAX_LITERAL_ID) {
+	if ((keys.size() + 1) * 2 > entries.size()) {
+		Grow();
+	}
+	auto slot = FindSlot(text.c_str(), text.size());
+	if (!entries[slot].info.LiteralId()) {
+		if (keys.size() >= LiteralInfo::MAX_LITERAL_ID) {
 			throw InvalidInputException("Grammar has too many distinct literals");
 		}
-		auto id = static_cast<uint16_t>(literals.size() + 1);
-		entry = literals.emplace(text, LiteralInfo(id)).first;
+		keys.push_back(make_uniq<string>(text));
+		auto &key = *keys.back();
+		entries[slot] = LiteralEntry {key.c_str(), static_cast<uint32_t>(key.size()),
+		                              LiteralInfo(static_cast<uint16_t>(keys.size()))};
 	}
-	entry->second.AddCategory(category);
+	entries[slot].info.AddCategory(category);
 }
 
 } // namespace duckdb

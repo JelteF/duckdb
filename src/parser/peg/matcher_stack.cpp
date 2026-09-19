@@ -37,23 +37,14 @@ optional<MatcherResult> PackratMatchState::TryLoadCachedResult(const Matcher &ma
 	return MatcherResult::Failure();
 }
 
-void PackratMatchState::StoreResult(const Matcher &matcher, MatchState &state, const MatcherResult &result) const {
-	if (!token_index_before.IsValid()) {
-		return;
-	}
+void PackratMatchState::StoreResultInternal(const Matcher &matcher, MatchState &state,
+                                            const MatcherResult &result) const {
 	ParserPackratEntry cache_entry;
 	cache_entry.success = result.IsSuccess();
 	cache_entry.token_index_after = state.token_iterator.Position();
 	cache_entry.max_token_index_seen = MaxValue(max_token_index_before, state.GetMaxTokenIndex());
 	cache_entry.result = result.GetParseResult();
 	state.context.packrat_cache->Store(matcher, token_index_before.GetIndex(), cache_entry);
-}
-
-MatchStackFrame::MatchStackFrame(MatchInput input) : matcher(input.matcher), match_state(input.state) {
-}
-
-bool MatchStackFrame::IsInitialized() const {
-	return process || result;
 }
 
 MatcherResult MatchStack::ExecuteAtomicMatcher(MatchInput input) {
@@ -87,6 +78,7 @@ void MatchStack::InitializeFrame(MatchStackFrame &frame) {
 		auto cached_result = frame.packrat_state.TryLoadCachedResult(matcher, state);
 		if (cached_result) {
 			frame.result = *cached_result;
+			frame.has_result = true;
 			return;
 		}
 	}
@@ -98,30 +90,32 @@ bool MatchStack::ExecuteFrame(MatchStackFrame &frame) {
 		InitializeFrame(frame);
 		D_ASSERT(frame.IsInitialized());
 	}
-	if (frame.result) {
+	if (frame.has_result) {
 		return true;
 	}
 	D_ASSERT(frame.process);
-	auto step = frame.process->Resume(frame.child_result);
-	frame.child_result.reset();
-	auto child = step.GetChild();
-	if (!child) {
+	auto step = frame.process->Resume(frame.has_child_result ? &frame.child_result : nullptr);
+	frame.has_child_result = false;
+	if (!step.HasChild()) {
 		frame.result = step.GetResult();
+		frame.has_result = true;
 		return true;
 	}
-	if (child->matcher.IsAtomic()) {
-		frame.child_result = ExecuteAtomicMatcher(*child);
+	auto child = step.GetChild();
+	if (child.matcher.IsAtomic()) {
+		frame.child_result = ExecuteAtomicMatcher(child);
+		frame.has_child_result = true;
 		return false;
 	}
-	PushFrame(*child);
+	PushFrame(child);
 	return false;
 }
 
 MatcherResult MatchStack::FinalizeFrame(MatchStackFrame &frame) {
-	if (!frame.result) {
+	if (!frame.has_result) {
 		throw InternalException("Trying to finalize a frame without a stored result");
 	}
-	auto result = *frame.result;
+	auto result = frame.result;
 	auto &matcher = frame.matcher;
 	auto &state = frame.match_state;
 	frame.packrat_state.StoreResult(matcher, state, result);
@@ -144,8 +138,9 @@ MatcherResult MatchStack::Execute(MatchInput input) {
 			return result;
 		}
 		auto &parent = frames.back();
-		D_ASSERT(!parent.child_result);
+		D_ASSERT(!parent.has_child_result);
 		parent.child_result = result;
+		parent.has_child_result = true;
 	}
 	throw InternalException("Matcher stack completed without a result");
 }

@@ -35,9 +35,9 @@ public:
 		if (!MatchKeyword(state)) {
 			return MatcherResult::Failure();
 		}
-		auto result = state.AllocateParseResult<KeywordParseResult>(token_text, start_offset, token_length);
+		auto result = state.AllocateParseResult<KeywordParseResult>(string {token_text}, start_offset, token_length);
 		if (result.HasParseResult()) {
-			result.GetParseResult()->name = name;
+			result.GetParseResult()->SetName(name);
 		}
 		return result;
 	}
@@ -59,15 +59,30 @@ public:
 		return optional_idx();
 	}
 
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		return KeywordMatches(state);
+	}
+	//! The keyword's id in the grammar's literal table, or 0 when it is matched by text comparison instead
+	uint16_t LiteralId() const {
+		return literal_table ? literal_info.LiteralId() : 0;
+	}
+	optional_ptr<const GrammarLiteralTable> GetLiteralTable() const {
+		return literal_table;
+	}
+
 private:
-	bool MatchKeyword(MatchState &state) const {
+	bool KeywordMatches(MatchState &state) const {
 		auto token = state.token_iterator.Current();
 		if (!token) {
 			return false;
 		}
-		const auto matches = literal_table ? state.token_iterator.CurrentLiteralInfo(*literal_table) == literal_info
-		                                   : StringUtil::CIEquals(keyword, token->text);
-		if (matches) {
+		return literal_table
+		           ? state.token_iterator.CurrentLiteralInfo(*literal_table) == literal_info
+		           : StringUtil::CIEquals(keyword.c_str(), keyword.size(), token->text.data(), token->text.size());
+	}
+
+	bool MatchKeyword(MatchState &state) const {
+		if (KeywordMatches(state)) {
 			// move to the next token
 			state.token_iterator.Advance();
 			state.UpdateMaxTokenIndex();
