@@ -16,6 +16,7 @@
 #include "duckdb/common/enums/identifier_case_mode.hpp"
 #include "duckdb/parser/parser_extension.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
+#include "duckdb/common/bit_utils.hpp"
 #include "duckdb/parser/token_iterator.hpp"
 #include "duckdb/parser/peg/parser_packrat.hpp"
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
@@ -293,16 +294,35 @@ struct MatcherStartSet {
 	//! Anything may start this matcher (custom or untyped atomic matchers, or a cycle in the grammar): never prune
 	bool any = false;
 	optional_ptr<const GrammarLiteralTable> literal_table;
-	//! Sorted literal ids of the keywords that can start the matcher
-	vector<uint16_t> literal_ids;
-	//! `literal_ids` folded into 64 buckets. A literal whose bucket is clear is certainly not in the set, which
-	//! answers the common case - the token is not one this matcher starts with - without searching the list.
-	uint64_t literal_signature = 0;
-	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
-	vector<reference<const Matcher>> predicate_leaders;
+	//! One bit per literal id that can start the matcher. The grammar numbers its literals densely, so an id indexes
+	//! this directly: the answer is exact and takes one test, where a sorted list took a search and a bloom filter
+	//! to keep the common miss cheap. The words live in MatcherAllocator::start_set_bits, one buffer for the whole
+	//! grammar, so reaching them is a load from a contiguous region rather than a chase into a node of its own.
+	const uint64_t *literal_words = nullptr;
+	uint32_t literal_word_count = 0;
+	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher. Like the bitmap,
+	//! these live in one buffer for the whole grammar rather than a vector per set.
+	const reference<const Matcher> *leaders = nullptr;
+	uint32_t leader_count = 0;
 
-	static uint64_t SignatureBit(uint16_t literal_id) {
-		return uint64_t(1) << (literal_id & 63);
+	bool HasLiteral(uint16_t literal_id) const {
+		auto word = static_cast<idx_t>(literal_id) / 64;
+		if (word >= literal_word_count) {
+			return false;
+		}
+		return (literal_words[word] & (uint64_t(1) << (literal_id % 64))) != 0;
+	}
+
+	template <class FUNC>
+	void ForEachLiteral(FUNC &&callback) const {
+		for (idx_t word = 0; word < literal_word_count; word++) {
+			auto bits = literal_words[word];
+			while (bits) {
+				auto bit = CountZeros<uint64_t>::Trailing(bits);
+				callback(static_cast<uint16_t>(word * 64 + bit));
+				bits &= bits - 1;
+			}
+		}
 	}
 };
 
@@ -323,7 +343,36 @@ public:
 	//! pushing a frame for them. Returns false only when a match is certainly impossible; anything unsure (custom
 	//! matchers, nullable children, deep nesting) answers true. Never prunes at the autocomplete cursor, where the
 	//! failing children are what produce the suggestions.
-	bool MayMatchHere(MatchState &state) const;
+	//! Inline: asked for nearly every child the matcher considers, and answered from the start set without a call
+	bool MayMatchHere(MatchState &state) const {
+		auto token = state.token_iterator.Current();
+		if (!token) {
+			return true;
+		}
+		// never prune at the auto-complete cursor, where the failing children are what produce the suggestions
+		if (state.token_iterator.HasAutocompleteCursor() && token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
+			return true;
+		}
+		if (!start_set_computed) {
+			return CanStartWith(state, 0);
+		}
+		auto set = &start_set;
+		if (set->any) {
+			return true;
+		}
+		if (set->literal_word_count != 0) {
+			auto literal_id = state.token_iterator.CurrentLiteralInfo(*set->literal_table).LiteralId();
+			if (literal_id && set->HasLiteral(literal_id)) {
+				return true;
+			}
+		}
+		if (set->leader_count == 0) {
+			return false;
+		}
+		return MatchesPredicateLeader(state, *set);
+	}
+	//! The uncommon half of MayMatchHere: a matcher that identifiers or operators can start
+	bool MatchesPredicateLeader(MatchState &state, const MatcherStartSet &set) const;
 	//! Token predicate for atomic matchers, consulted through the start sets; composite matchers never override it
 	virtual bool CanStartWith(MatchState &state, idx_t depth) const {
 		return true;
@@ -333,7 +382,7 @@ public:
 	}
 	//! The tokens this matcher can start with, or null before MatcherAllocator::ComputeStartSets ran
 	optional_ptr<const MatcherStartSet> GetStartSet() const {
-		return start_set.get();
+		return start_set_computed ? optional_ptr<const MatcherStartSet>(start_set) : nullptr;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;
@@ -405,7 +454,10 @@ protected:
 	optional_ptr<const CompiledGrammarRule> rule;
 	//! See MatcherStartSet; null until MatcherAllocator::ComputeStartSets ran (MayMatchHere then falls back to the
 	//! matcher's own CanStartWith)
-	unique_ptr<MatcherStartSet> start_set;
+	//! Held by value rather than behind a pointer: the check that reads it runs 24,684 times per statement, and what
+	//! that check waits on is the chain of loads to reach the bits, not the size of a matcher.
+	MatcherStartSet start_set;
+	bool start_set_computed = false;
 	bool nullable = false;
 };
 
@@ -447,6 +499,11 @@ public:
 private:
 	vector<unique_ptr<Matcher>> matchers;
 	vector<unique_ptr<PrecedenceLadder>> ladders;
+	//! Every matcher's start set, and every start set's literal bitmap, each in one contiguous buffer. The matcher
+	//! graph is walked at random, so what costs is the chase into a scattered node, not the bytes.
+	vector<MatcherStartSet> start_sets;
+	vector<uint64_t> start_set_bits;
+	vector<reference<const Matcher>> start_set_leaders;
 };
 
 //! Owns the parse results of one match run. Results are carved out of an arena instead of being allocated one by
