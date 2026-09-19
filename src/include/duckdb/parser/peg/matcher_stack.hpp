@@ -28,10 +28,13 @@ private:
 
 struct MatchStackFrame {
 public:
-	explicit MatchStackFrame(MatchInput input);
+	explicit MatchStackFrame(MatchInput input) : matcher(input.matcher), match_state(input.state) {
+	}
 
 public:
-	bool IsInitialized() const;
+	bool IsInitialized() const {
+		return process || has_result;
+	}
 
 public:
 	const Matcher &matcher;

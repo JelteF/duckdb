@@ -49,13 +49,6 @@ void PackratMatchState::StoreResult(const Matcher &matcher, MatchState &state, c
 	state.context.packrat_cache->Store(matcher, token_index_before.GetIndex(), cache_entry);
 }
 
-MatchStackFrame::MatchStackFrame(MatchInput input) : matcher(input.matcher), match_state(input.state) {
-}
-
-bool MatchStackFrame::IsInitialized() const {
-	return process || has_result;
-}
-
 MatcherResult MatchStack::ExecuteAtomicMatcher(MatchInput input) {
 	auto &matcher = input.matcher;
 	auto &state = input.state;
