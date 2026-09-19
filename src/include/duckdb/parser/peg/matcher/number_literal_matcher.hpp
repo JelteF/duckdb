@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
 #include "duckdb/parser/peg/matcher.hpp"
@@ -27,7 +29,7 @@ public:
 			return MatcherResult::Failure();
 		}
 		state.token_iterator.SetPreviousTokenType(TokenType::NUMBER_LITERAL);
-		auto result = state.AllocateParseResult<NumberParseResult>(token_text, start_offset, token_length);
+		auto result = state.AllocateParseResult<NumberParseResult>(string {token_text}, start_offset, token_length);
 		if (result.HasParseResult()) {
 			result.GetParseResult()->SetName(name);
 		}
@@ -49,7 +51,7 @@ public:
 
 private:
 	//! The cheap half of MatchNumberLiteral: only a token starting with a digit or a '.' can be a number
-	static bool StartsNumberLiteral(const string &token_text) {
+	static bool StartsNumberLiteral(std::string_view token_text) {
 		if (token_text.empty() || !Tokenizer::CharacterIsInitialNumber(token_text[0])) {
 			return false;
 		}

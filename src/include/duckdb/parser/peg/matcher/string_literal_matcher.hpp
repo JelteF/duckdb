@@ -109,17 +109,18 @@ private:
 			return false;
 		}
 		const auto delimiter = token.text.substr(0, delimiter_length);
-		return StringUtil::EndsWith(token.text, delimiter);
+		return token.text.size() >= delimiter.size() &&
+		       token.text.compare(token.text.size() - delimiter.size(), delimiter.size(), delimiter) == 0;
 	}
 
 	static string StripStringLiteral(const MatcherToken &token, const SpecialStringInfo &string_info) {
 		idx_t delimiter_length;
 		if (TryGetDollarQuoteDelimiterLength(token, delimiter_length)) {
-			return token.text.substr(delimiter_length, token.text.length() - 2 * delimiter_length);
+			return string {token.text.substr(delimiter_length, token.text.length() - 2 * delimiter_length)};
 		}
 		idx_t suffix_len = 1;
-		auto stripped_string =
-		    token.text.substr(string_info.prefix_len, token.text.length() - (string_info.prefix_len + suffix_len));
+		auto stripped_string = string {
+		    token.text.substr(string_info.prefix_len, token.text.length() - (string_info.prefix_len + suffix_len))};
 		return StringUtil::Replace(stripped_string, "''", "'");
 	}
 

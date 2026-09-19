@@ -2,7 +2,7 @@
 
 namespace duckdb {
 
-bool OperatorMatcher::HasSpecialPrecedence(const string &operator_name) {
+bool OperatorMatcher::HasSpecialPrecedence(std::string_view operator_name) {
 	switch (operator_name.size()) {
 	case 1:
 		switch (operator_name[0]) {
