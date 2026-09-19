@@ -26,10 +26,10 @@ void ParserTokenizerBehavior::PushToken(idx_t start, idx_t end, TokenType type, 
 void ParserTokenizerBehavior::OnStatementEnd(idx_t pos) {
 	// Always emit ';' as a TERMINATOR token so the grammar can consume it.
 	// Statement boundaries are determined by the PEG grammar (Program rule), not the tokenizer.
-	tokens.emplace_back(";", pos, TokenType::TERMINATOR);
+	tokens.emplace_back(";", 1, pos, TokenType::TERMINATOR);
 }
 
-void ParserTokenizerBehavior::OnLastToken(const Tokenizer &tokenizer, TokenizeState state, string last_word,
+void ParserTokenizerBehavior::OnLastToken(const Tokenizer &tokenizer, TokenizeState state, std::string_view last_word,
                                           idx_t last_pos) {
 	switch (state) {
 	case TokenizeState::STRING_LITERAL:
@@ -39,7 +39,7 @@ void ParserTokenizerBehavior::OnLastToken(const Tokenizer &tokenizer, TokenizeSt
 	default:
 		break;
 	}
-	TokenizerBehavior::OnLastToken(tokenizer, state, std::move(last_word), last_pos);
+	TokenizerBehavior::OnLastToken(tokenizer, state, last_word, last_pos);
 }
 
 } // namespace duckdb

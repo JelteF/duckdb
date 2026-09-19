@@ -91,7 +91,7 @@ vector<SimpleToken> TokenIterator::RemainingTokens() const {
 	vector<SimpleToken> result;
 	result.reserve(tokens.size() - position);
 	for (idx_t index = position; index < tokens.size(); index++) {
-		result.emplace_back(tokens[index].text, tokens[index].type);
+		result.emplace_back(string {tokens[index].text}, tokens[index].type);
 	}
 	return result;
 }
@@ -99,7 +99,7 @@ vector<SimpleToken> TokenIterator::RemainingTokens() const {
 string TokenIterator::ToString() const {
 	string result;
 	for (auto &token : tokens) {
-		result += token.text + " ";
+		result += string {token.text} + " ";
 	}
 	return result;
 }

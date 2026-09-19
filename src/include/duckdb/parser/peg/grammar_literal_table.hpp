@@ -8,6 +8,8 @@
 #pragma once
 
 #include "duckdb/common/string_util.hpp"
+
+#include <string_view>
 #include "duckdb/parser/peg/keyword_helper.hpp"
 
 namespace duckdb {
@@ -86,8 +88,8 @@ public:
 			slot = (slot + 1) & mask;
 		}
 	}
-	LiteralInfo Lookup(const string &text) const {
-		return Lookup(text.c_str(), text.size());
+	LiteralInfo Lookup(std::string_view text) const {
+		return Lookup(text.data(), text.size());
 	}
 
 private:

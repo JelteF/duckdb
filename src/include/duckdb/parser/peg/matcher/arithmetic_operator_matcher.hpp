@@ -25,7 +25,7 @@ public:
 		if (!MatchArithmeticOperator(state)) {
 			return MatcherResult::Failure();
 		}
-		return state.AllocateParseResult<OperatorParseResult>(token_text, start_offset, token_length);
+		return state.AllocateParseResult<OperatorParseResult>(string {token_text}, start_offset, token_length);
 	}
 
 	SuggestionType AddSuggestionInternal(MatchState &state) const override {

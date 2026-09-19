@@ -76,7 +76,7 @@ TEST_CASE("Literal choice dispatch retains autocomplete metadata", "[api][gramma
 static LiteralChoiceTestResult MatchLiteralChoiceTest(const Matcher &matcher, const string &text, MatchMode mode) {
 	vector<MatcherToken> tokens;
 	if (!text.empty()) {
-		tokens.emplace_back(text, 0, TokenType::KEYWORD);
+		tokens.emplace_back(text.c_str(), text.size(), 0, TokenType::KEYWORD);
 	}
 	TokenIterator iterator(tokens);
 	vector<MatcherSuggestion> suggestions;
@@ -106,7 +106,7 @@ TEST_CASE("Literal choice dispatch preserves ordered choice results", "[api][gra
 	REQUIRE(table);
 	REQUIRE(choice.matchers[0].get().Cast<KeywordMatcher>().GetDispatchLiteral(*table).IsValid());
 	for (auto &text : vector<string> {"WHERE", "unknown_literal"}) {
-		vector<MatcherToken> tokens {MatcherToken(text, 0, TokenType::KEYWORD)};
+		vector<MatcherToken> tokens {MatcherToken(text.c_str(), text.size(), 0, TokenType::KEYWORD)};
 		TokenIterator iterator(tokens);
 		vector<MatcherSuggestion> suggestions;
 		ParseResultAllocator parse_results;
@@ -146,7 +146,7 @@ public:
 	MatcherResult MatchAtomic(MatchState &state) const override {
 		calls++;
 		auto token = state.token_iterator.Current();
-		if (accepts_from && token && StringUtil::CIEquals(token->text, "FROM")) {
+		if (accepts_from && token && StringUtil::CIEquals(token->text.data(), token->text.size(), "FROM", 4)) {
 			state.token_iterator.Advance();
 			return MatcherResult::Success();
 		}
@@ -293,8 +293,8 @@ TEST_CASE("Token literal caches follow grammar identity and token edits", "[api]
 	GrammarLiteralTable first(grammar, first_categories);
 	optional<GrammarLiteralTable> second;
 	second.emplace(grammar, second_categories);
-	vector<MatcherToken> tokens {MatcherToken("select", 0, TokenType::KEYWORD),
-	                             MatcherToken("extension_word", 7, TokenType::IDENTIFIER)};
+	vector<MatcherToken> tokens {MatcherToken("select", 6, 0, TokenType::KEYWORD),
+	                             MatcherToken("extension_word", 14, 7, TokenType::IDENTIFIER)};
 	TokenIterator iterator(tokens);
 	REQUIRE(iterator.CurrentLiteralInfo(first).HasCategory(PEGKeywordCategory::KEYWORD_RESERVED));
 	TokenIterator branch(iterator);
@@ -335,7 +335,7 @@ public:
 };
 
 static bool MatchLiteralTestToken(const Matcher &matcher, const string &text) {
-	vector<MatcherToken> tokens {MatcherToken(text, 0, TokenType::IDENTIFIER)};
+	vector<MatcherToken> tokens {MatcherToken(text.c_str(), text.size(), 0, TokenType::IDENTIFIER)};
 	TokenIterator iterator(tokens);
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator allocator;
@@ -532,7 +532,7 @@ TEST_CASE("Literal caches respect active grammar extensions", "[api][grammar_ext
 	auto base = CompiledGrammar::Get(*con.context);
 	auto base_table = base->GetKeywordHelper().GetLiteralTable();
 	REQUIRE(base_table);
-	vector<MatcherToken> tokens {MatcherToken("answer", 0, TokenType::IDENTIFIER)};
+	vector<MatcherToken> tokens {MatcherToken("answer", 6, 0, TokenType::IDENTIFIER)};
 	TokenIterator iterator(tokens);
 	REQUIRE(iterator.CurrentLiteralInfo(*base_table).LiteralId() == 0);
 	RegisterGrammarExtensionTestSyntax(*db.instance);
