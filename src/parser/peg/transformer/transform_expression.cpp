@@ -1676,10 +1676,12 @@ transform_result_ptr PEGTransformerFactory::FinalizeLiteralExpressionTrampoline(
 	auto &choice_pr = list_pr.Child<ChoiceParseResult>(0);
 	auto &choice_result = choice_pr.GetResult();
 	unique_ptr<ParsedExpression> result;
-	if (choice_result.Name() == "StringLiteral") {
+	// which of the three the choice picked is the kind of result it produced, so there is no need to compare the
+	// rule's name here: this runs once per literal in the query
+	if (choice_result.type == ParseResultType::STRING) {
 		auto &string_literal = choice_result.Cast<StringLiteralParseResult>();
 		result = string_literal.ToExpression();
-	} else if (choice_result.Name() == "NumberLiteral") {
+	} else if (choice_result.type == ParseResultType::NUMBER) {
 		result = TransformNumberLiteral(transformer, choice_result);
 	} else {
 		auto &constant_list_pr = choice_result.Cast<ListParseResult>();
