@@ -154,16 +154,16 @@ public:
 			break;
 		}
 		// copied, not moved: the entry is memoized and later parents still merge its bits
-		set->literal_bits = entry.literal_bits;
 		entry.set = std::move(set);
 		entry.nullable = nullable;
 		entry.in_progress = false;
 		return entry;
 	}
 
-	unique_ptr<MatcherStartSet> Take(const Matcher &matcher, bool &nullable) {
+	unique_ptr<MatcherStartSet> Take(const Matcher &matcher, bool &nullable, vector<uint64_t> &literal_bits) {
 		auto &entry = Compute(matcher);
 		nullable = entry.nullable;
+		literal_bits = entry.literal_bits;
 		return std::move(entry.set);
 	}
 
@@ -223,8 +223,25 @@ void MatcherAllocator::ComputeStartSets() {
 	for (auto &matcher : matchers) {
 		builder.Compute(*matcher);
 	}
-	for (auto &matcher : matchers) {
-		matcher->start_set = builder.Take(*matcher, matcher->nullable);
+	// the sets go into one contiguous array and their bitmaps into one contiguous buffer, so that reaching either
+	// from a matcher is a load rather than a chase into a separately allocated node
+	start_sets.resize(matchers.size());
+	vector<idx_t> bit_offsets(matchers.size());
+	vector<idx_t> bit_counts(matchers.size());
+	for (idx_t i = 0; i < matchers.size(); i++) {
+		vector<uint64_t> literal_bits;
+		auto set = builder.Take(*matchers[i], matchers[i]->nullable, literal_bits);
+		start_sets[i] = std::move(*set);
+		bit_offsets[i] = start_set_bits.size();
+		bit_counts[i] = literal_bits.size();
+		start_set_bits.insert(start_set_bits.end(), literal_bits.begin(), literal_bits.end());
+	}
+	// only now is the buffer final, so only now can the spans into it be resolved
+	for (idx_t i = 0; i < matchers.size(); i++) {
+		auto &set = start_sets[i];
+		set.literal_words = start_set_bits.data() + bit_offsets[i];
+		set.literal_word_count = NumericCast<uint32_t>(bit_counts[i]);
+		matchers[i]->start_set = set;
 	}
 }
 

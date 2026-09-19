@@ -296,23 +296,25 @@ struct MatcherStartSet {
 	optional_ptr<const GrammarLiteralTable> literal_table;
 	//! One bit per literal id that can start the matcher. The grammar numbers its literals densely, so an id indexes
 	//! this directly: the answer is exact and takes one test, where a sorted list took a search and a bloom filter
-	//! to keep the common miss cheap.
-	vector<uint64_t> literal_bits;
+	//! to keep the common miss cheap. The words live in MatcherAllocator::start_set_bits, one buffer for the whole
+	//! grammar, so reaching them is a load from a contiguous region rather than a chase into a node of its own.
+	const uint64_t *literal_words = nullptr;
+	uint32_t literal_word_count = 0;
 	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
 	vector<reference<const Matcher>> predicate_leaders;
 
 	bool HasLiteral(uint16_t literal_id) const {
 		auto word = static_cast<idx_t>(literal_id) / 64;
-		if (word >= literal_bits.size()) {
+		if (word >= literal_word_count) {
 			return false;
 		}
-		return (literal_bits[word] & (uint64_t(1) << (literal_id % 64))) != 0;
+		return (literal_words[word] & (uint64_t(1) << (literal_id % 64))) != 0;
 	}
 
 	template <class FUNC>
 	void ForEachLiteral(FUNC &&callback) const {
-		for (idx_t word = 0; word < literal_bits.size(); word++) {
-			auto bits = literal_bits[word];
+		for (idx_t word = 0; word < literal_word_count; word++) {
+			auto bits = literal_words[word];
 			while (bits) {
 				auto bit = CountZeros<uint64_t>::Trailing(bits);
 				callback(static_cast<uint16_t>(word * 64 + bit));
@@ -356,7 +358,7 @@ public:
 		if (set->any) {
 			return true;
 		}
-		if (!set->literal_bits.empty()) {
+		if (set->literal_word_count != 0) {
 			auto literal_id = state.token_iterator.CurrentLiteralInfo(*set->literal_table).LiteralId();
 			if (literal_id && set->HasLiteral(literal_id)) {
 				return true;
@@ -378,7 +380,7 @@ public:
 	}
 	//! The tokens this matcher can start with, or null before MatcherAllocator::ComputeStartSets ran
 	optional_ptr<const MatcherStartSet> GetStartSet() const {
-		return start_set.get();
+		return start_set;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;
@@ -453,7 +455,7 @@ protected:
 	optional_ptr<const CompiledGrammarRule> rule;
 	//! See MatcherStartSet; null until MatcherAllocator::ComputeStartSets ran (MayMatchHere then falls back to the
 	//! matcher's own CanStartWith)
-	unique_ptr<MatcherStartSet> start_set;
+	optional_ptr<const MatcherStartSet> start_set;
 	bool nullable = false;
 };
 
@@ -495,6 +497,10 @@ public:
 private:
 	vector<unique_ptr<Matcher>> matchers;
 	vector<unique_ptr<PrecedenceLadder>> ladders;
+	//! Every matcher's start set, and every start set's literal bitmap, each in one contiguous buffer. The matcher
+	//! graph is walked at random, so what costs is the chase into a scattered node, not the bytes.
+	vector<MatcherStartSet> start_sets;
+	vector<uint64_t> start_set_bits;
 };
 
 //! Owns the parse results of one match run. Results are carved out of an arena instead of being allocated one by
