@@ -444,6 +444,8 @@ public:
 	void ComputeStartSets();
 	//! Take ownership of a precedence ladder, which lives as long as the matchers that refer to it
 	PrecedenceLadder &AddLadder(unique_ptr<PrecedenceLadder> ladder);
+	//! Fuse the element of every repeat that is written as `(Atom X)*` into the repeat itself
+	void FuseRepeatElements();
 
 private:
 	vector<unique_ptr<Matcher>> matchers;

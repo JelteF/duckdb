@@ -3,6 +3,7 @@
 #include "duckdb/parser/peg/matcher.hpp"
 
 namespace duckdb {
+class ListMatcher;
 
 class RepeatMatcher : public Matcher {
 public:
@@ -29,8 +30,18 @@ public:
 		return element;
 	}
 
+	//! An element of the form `Atom X` is matched in the repeat's own frame, which builds the list result the
+	//! element would have built. See RepeatMatchProcess.
+	void SetFusedElement(const ListMatcher &element_p) {
+		fused_element = element_p;
+	}
+	optional_ptr<const ListMatcher> GetFusedElement() const {
+		return fused_element;
+	}
+
 private:
 	Matcher &element;
+	optional_ptr<const ListMatcher> fused_element;
 };
 
 } // namespace duckdb
