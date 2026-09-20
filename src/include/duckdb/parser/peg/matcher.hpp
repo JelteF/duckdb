@@ -200,6 +200,11 @@ struct MatchState {
 	template <class PROCESS, class... ARGS>
 	arena_ptr<MatchProcess> Make(ARGS &&... args);
 
+	void UpdateMaxTokenIndexTo(idx_t token_index) {
+		if (token_index > context.max_token_index) {
+			context.max_token_index = token_index;
+		}
+	}
 	void UpdateMaxTokenIndex() {
 		if (token_iterator.Position() > context.max_token_index) {
 			context.max_token_index = token_iterator.Position();
@@ -347,6 +352,23 @@ public:
 	//! failing children are what produce the suggestions.
 	//! Inline: asked for nearly every child the matcher considers, and answered from the start set without a call
 	bool MayMatchHere(MatchState &state) const {
+		if (!MayStartHere(state)) {
+			return false;
+		}
+		if (second_literal_id == 0 || state.token_iterator.HasAutocompleteCursor()) {
+			return true;
+		}
+		// the first token can start this, but the second rules it out - a qualified name at an unqualified one.
+		// The token was examined, so it counts as reached: a syntax error here points at it and not before it.
+		if (state.token_iterator.LiteralInfoAt(1, *second_literal_table).LiteralId() == second_literal_id) {
+			return true;
+		}
+		state.UpdateMaxTokenIndexTo(state.token_iterator.Position() + 1);
+		return false;
+	}
+
+	//! The start-set half of MayMatchHere: can the token the matcher is at start it at all
+	bool MayStartHere(MatchState &state) const {
 		auto token = state.token_iterator.Current();
 		if (!token) {
 			return true;
@@ -455,6 +477,11 @@ protected:
 	string name;
 	optional_idx packrat_id;
 	bool packrat_memoized = false;
+	//! The literal that has to follow this matcher's first token, when the grammar guarantees one: the matcher
+	//! begins with an element that always consumes exactly one token, and only this literal can follow it. Zero
+	//! when there is no such guarantee. See StartSetBuilder.
+	uint16_t second_literal_id = 0;
+	optional_ptr<const GrammarLiteralTable> second_literal_table;
 	bool collapsible = false;
 	optional_ptr<const CompiledGrammarRule> rule;
 	//! See MatcherStartSet; null until MatcherAllocator::ComputeStartSets ran (MayMatchHere then falls back to the

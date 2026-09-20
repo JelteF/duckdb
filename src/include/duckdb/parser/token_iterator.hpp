@@ -52,6 +52,14 @@ public:
 		}
 		return tokens[position];
 	}
+	//! Inline: MayMatchHere asks for the token after the current one for every matcher with a second literal
+	LiteralInfo LiteralInfoAt(idx_t offset, const GrammarLiteralTable &table) {
+		auto index = position + offset;
+		if (index >= tokens.size()) {
+			return LiteralInfo();
+		}
+		return tokens[index].GetLiteralInfo(table);
+	}
 	//! True when the stream was tokenized for auto-completion, which puts the cursor token at the end. Answered from
 	//! a flag rather than from the last token: this is asked once per matcher frame, and the end of a long token
 	//! stream is nowhere near the tokens the matcher is looking at.
