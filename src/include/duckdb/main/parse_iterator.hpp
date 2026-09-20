@@ -17,6 +17,7 @@ class ClientContext;
 class Parser;
 class SQLStatement;
 class TokenIterator;
+struct ParserScratch;
 
 //! Iterator over the parse-facing statements of a multi-statement query.
 //!
@@ -72,6 +73,8 @@ private:
 	unique_ptr<Parser> parser;
 	//! Tokenized view of `sql` and its current position. Populated once on the first Peek.
 	unique_ptr<TokenIterator> token_iterator;
+	//! Reused across the statements of this iteration, like Parser::ParseQuery does
+	unique_ptr<ParserScratch> scratch;
 	//! Single-statement buffer holding the result of the most recent Peek. Cleared by
 	//! GetStatement.
 	unique_ptr<SQLStatement> current_statement;

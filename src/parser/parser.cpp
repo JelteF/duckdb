@@ -298,9 +298,12 @@ void Parser::ParseQuery(const string &query_p) {
 	auto &tokenizer = GetGrammar().GetTokenizer();
 	tokenizer.TokenizeInput(behavior);
 	TokenIterator token_iterator(std::move(owned_tokens));
+	// one scratch for the whole query: a script of sixty statements would otherwise build and
+	// tear down its arenas, result allocator and suggestion buffer sixty times
+	ParserScratch scratch;
 	while (token_iterator.Current()) {
 		try {
-			auto stmt = ParseTopLevelStatement(token_iterator);
+			auto stmt = ParseTopLevelStatement(token_iterator, scratch);
 			if (stmt) {
 				statements.push_back(std::move(stmt));
 			}
@@ -374,12 +377,12 @@ unique_ptr<SQLStatement> Parser::TryParseExtensionStatement(TokenIterator &token
 	return nullptr;
 }
 
-unique_ptr<SQLStatement> Parser::ParseTopLevelStatement(TokenIterator &token_iterator) {
+unique_ptr<SQLStatement> Parser::ParseTopLevelStatement(TokenIterator &token_iterator, ParserScratch &scratch) {
 	if (!token_iterator.Current()) {
 		return nullptr;
 	}
 	auto &compiled_grammar = GetGrammar();
-	return PEGTransformerFactory::TransformTopLevelStatement(token_iterator, options, compiled_grammar);
+	return PEGTransformerFactory::TransformTopLevelStatement(token_iterator, options, compiled_grammar, scratch);
 }
 
 vector<SimplifiedToken> Parser::Tokenize(const string &query) {

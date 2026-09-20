@@ -64,6 +64,7 @@
 #include "duckdb/parser/tableref/pivotref.hpp"
 
 namespace duckdb {
+struct ParserScratch;
 
 // Forward declare
 struct QualifiedName;
@@ -646,7 +647,8 @@ public:
 	//! Throws on syntax error. `token_cursor` is in/out: it's the token index where matching
 	//! starts, and on return holds the token index immediately past the last consumed token.
 	static unique_ptr<SQLStatement> TransformTopLevelStatement(TokenIterator &token_iterator, ParserOptions &options,
-	                                                           const CompiledGrammar &grammar);
+	                                                           const CompiledGrammar &grammar,
+	                                                          ParserScratch &scratch);
 	static ParseResult &ExtractResultFromParens(ParseResult &parse_result);
 	static vector<reference<ParseResult>> ExtractParseResultsFromList(ParseResult &parse_result);
 	static bool ExpressionIsEmptyStar(const ParsedExpression &expr);
