@@ -41,6 +41,10 @@ public:
 	Matcher &GetMatcher(const string &rule_name);
 	//! Index what the start sets say, which is only possible once MatcherAllocator::ComputeStartSets has run
 	void IndexStartSets();
+	//! Number of memoized matchers created so far
+	idx_t PackratMatcherCount() const {
+		return packrat_matcher_count;
+	}
 
 protected:
 	// Base primitives
@@ -93,6 +97,8 @@ private:
 	string_set_t packrat_memoized_rules;
 	string_set_t collapsible_rules;
 	vector<reference<PrecedenceLadder>> ladders;
+	//! Dense ids handed out to memoized matchers, see Matcher::SetPackratMemoized
+	idx_t packrat_matcher_count = 0;
 };
 
 } // namespace duckdb

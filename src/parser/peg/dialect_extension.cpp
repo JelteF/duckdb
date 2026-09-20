@@ -53,9 +53,9 @@ shared_ptr<CompiledGrammar> DialectExtension::GetCompiledGrammar(const ClientCon
 	allocator.ComputeStartSets();
 	matcher_factory->IndexStartSets();
 
-	auto result = shared_ptr<CompiledGrammar>(new CompiledGrammar(std::move(allocator), std::move(keyword_helper),
-	                                                              std::move(tokenizer), std::move(rules),
-	                                                              program_matcher, top_level_statement_matcher));
+	auto result = shared_ptr<CompiledGrammar>(
+	    new CompiledGrammar(std::move(allocator), std::move(keyword_helper), std::move(tokenizer), std::move(rules),
+	                        program_matcher, top_level_statement_matcher, matcher_factory->PackratMatcherCount()));
 
 	lock_guard<mutex> guard(lock);
 	if (!cache) {
