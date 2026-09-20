@@ -105,7 +105,12 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformTopLevelStatement(Token
 	}
 
 	ArenaAllocator transformer_allocator(Allocator::DefaultAllocator());
-	PEGTransformer transformer(transformer_allocator, token_iterator, options, grammar);
+	// the cached rule names belong to this grammar; a different one invalidates them
+	if (scratch.rule_cache_grammar.get() != &grammar) {
+		scratch.rule_cache.clear();
+		scratch.rule_cache_grammar = &grammar;
+	}
+	PEGTransformer transformer(transformer_allocator, token_iterator, options, grammar, scratch.rule_cache);
 
 	return ExtractAndTransformStatement(transformer, token_iterator, stmt_opt.GetResult(), terminator_offset);
 }

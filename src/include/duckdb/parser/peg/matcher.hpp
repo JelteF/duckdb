@@ -28,6 +28,8 @@ namespace duckdb {
 class ClientContext;
 class PEGTransformerFactory;
 class ParseResultAllocator;
+struct CompiledGrammarRule;
+struct CompiledGrammar;
 class Matcher;
 class MatcherAllocator;
 class MatchProcess;
@@ -573,6 +575,10 @@ struct ParserScratch {
 	ArenaAllocator process_allocator;
 	//! The packrat cache outlives those processes, so it gets an arena of its own
 	ArenaAllocator packrat_allocator;
+	//! Rule lookups by name, kept across statements: the names are the grammar's own string
+	//! literals, so the pointers stay valid as long as the grammar the cache was built for.
+	unordered_map<const char *, reference<const CompiledGrammarRule>> rule_cache;
+	optional_ptr<const CompiledGrammar> rule_cache_grammar;
 };
 
 template <class PROCESS, class... ARGS>
