@@ -216,7 +216,7 @@ Matcher &MatcherFactory::CreateMatcher(string_t rule_name, vector<reference<Matc
 
 	matcher.SetRule(compiled_rule);
 	if (packrat_memoized_rules.count(rule_name)) {
-		matcher.SetPackratMemoized();
+		matcher.SetPackratMemoized(packrat_matcher_count++);
 	}
 	if (collapsible_rules.count(rule_name)) {
 		matcher.SetCollapsible();
@@ -234,7 +234,7 @@ void MatcherFactory::AddKeywordOverride(const char *name, KeywordInfo info) {
 void MatcherFactory::AddRuleOverride(const char *name, unique_ptr<Matcher> &&matcher_p) {
 	auto &matcher = allocator.Allocate(std::move(matcher_p));
 	if (packrat_memoized_rules.count(name)) {
-		matcher.SetPackratMemoized();
+		matcher.SetPackratMemoized(packrat_matcher_count++);
 	}
 	if (grammar.GetRule(name)) {
 		auto rule_p = GetRule(name);
