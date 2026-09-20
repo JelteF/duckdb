@@ -439,8 +439,10 @@ private:
 class PEGTransformer {
 public:
 	PEGTransformer(ArenaAllocator &allocator, TokenIterator &token_iterator, ParserOptions &options_p,
-	               const CompiledGrammar &grammar_p)
-	    : allocator(allocator), token_iterator(token_iterator), options(options_p), grammar(grammar_p) {
+	               const CompiledGrammar &grammar_p,
+	               unordered_map<const char *, reference<const CompiledGrammarRule>> &rule_cache_p)
+	    : allocator(allocator), token_iterator(token_iterator), options(options_p), grammar(grammar_p),
+	      rule_cache(rule_cache_p) {
 	}
 
 	const CompiledGrammarRule &GetRule(const string &rule_name) const;
@@ -587,8 +589,9 @@ public:
 	const CompiledGrammar &grammar;
 
 private:
-	//! See GetRule(const char *)
-	unordered_map<const char *, reference<const CompiledGrammarRule>> rule_cache;
+	//! See GetRule(const char *). Owned by the parse's scratch so that a query of many statements
+	//! builds it once rather than once per statement.
+	unordered_map<const char *, reference<const CompiledGrammarRule>> &rule_cache;
 
 private:
 	friend class GeneratedTransformProcess;
@@ -647,8 +650,7 @@ public:
 	//! Throws on syntax error. `token_cursor` is in/out: it's the token index where matching
 	//! starts, and on return holds the token index immediately past the last consumed token.
 	static unique_ptr<SQLStatement> TransformTopLevelStatement(TokenIterator &token_iterator, ParserOptions &options,
-	                                                           const CompiledGrammar &grammar,
-	                                                          ParserScratch &scratch);
+	                                                           const CompiledGrammar &grammar, ParserScratch &scratch);
 	static ParseResult &ExtractResultFromParens(ParseResult &parse_result);
 	static vector<reference<ParseResult>> ExtractParseResultsFromList(ParseResult &parse_result);
 	static bool ExpressionIsEmptyStar(const ParsedExpression &expr);
