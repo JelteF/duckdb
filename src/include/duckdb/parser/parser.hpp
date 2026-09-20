@@ -22,6 +22,7 @@ namespace duckdb {
 struct CompiledGrammar;
 struct MatcherToken;
 class TokenIterator;
+struct ParserScratch;
 class GroupByNode;
 struct UnicodeSpace {
 	UnicodeSpace(idx_t pos, idx_t bytes) : pos(pos), bytes(bytes) {
@@ -56,7 +57,7 @@ public:
 	//!
 	//! Does NOT populate `stmt->query` — the caller owns the source string and can slice it
 	//! using `stmt->stmt_location` if needed.
-	DUCKDB_API unique_ptr<SQLStatement> ParseTopLevelStatement(TokenIterator &token_iterator);
+	DUCKDB_API unique_ptr<SQLStatement> ParseTopLevelStatement(TokenIterator &token_iterator, ParserScratch &scratch);
 
 	//! Run the `parse_function` extensions over the unconsumed tail of `query`,
 	//! the way `ParseQuery` does in its catch handler. Returns the produced `ExtensionStatement`

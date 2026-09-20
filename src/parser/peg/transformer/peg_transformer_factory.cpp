@@ -47,22 +47,21 @@ static unique_ptr<SQLStatement> ExtractAndTransformStatement(PEGTransformer &tra
 
 unique_ptr<SQLStatement> PEGTransformerFactory::TransformTopLevelStatement(TokenIterator &token_iterator,
                                                                            ParserOptions &options,
-                                                                           const CompiledGrammar &grammar) {
+                                                                           const CompiledGrammar &grammar,
+                                                                           ParserScratch &scratch) {
 	if (!token_iterator.Current()) {
 		return nullptr;
 	}
-	vector<MatcherSuggestion> suggestions;
-	ParseResultAllocator parse_result_allocator;
+	scratch.Reset();
+	auto &suggestions = scratch.suggestions;
+	auto &parse_result_allocator = scratch.parse_results;
+	auto &process_allocator = scratch.process_allocator;
 	idx_t max_token_index = token_iterator.Position();
-	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
-	// the cache outlives the match processes, so it must not share the arena they are recycled from
-	ArenaAllocator packrat_allocator(Allocator::DefaultAllocator());
-	ParserPackratCache packrat_cache(packrat_allocator, token_iterator.Size(), grammar.PackratMatcherCount());
+	ParserPackratCache packrat_cache(scratch.packrat_allocator, token_iterator.Size(), grammar.PackratMatcherCount());
 	MatchContext match_context(suggestions, parse_result_allocator, process_allocator, max_token_index,
 	                           MatchMode::BUILD_PARSE_RESULT, options.identifier_case_mode, &packrat_cache);
 	MatchState state(token_iterator, match_context);
 	auto match_result = grammar.TopLevelStatementMatcher().MatchParseResult(state);
-	process_allocator.FreeAll();
 	if (!match_result.IsSuccess()) {
 		// syntax error — surface as a parser exception in the same shape as Transform()
 		auto token_stream = token_iterator.ToString();

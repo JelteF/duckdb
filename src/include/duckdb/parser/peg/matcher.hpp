@@ -539,10 +539,40 @@ public:
 		return ParseResultChildren(target, count);
 	}
 
+	//! Drop everything this allocator handed out. The results of one statement are dead once it
+	//! has been transformed, so a query of many statements can reuse the arena instead of taking
+	//! a new one per statement.
+	void Reset() {
+		parse_results.clear();
+		arena.Reset();
+	}
+
 private:
 	ArenaAllocator arena;
 	//! Only tracked to run the destructors; the memory itself belongs to the arena
 	vector<arena_ptr<ParseResult>> parse_results;
+};
+
+//! The per-statement scratch of a parse. Held for the whole query so that a script of many
+//! statements does not build and tear it down once per statement.
+struct ParserScratch {
+	ParserScratch()
+	    : process_allocator(Allocator::DefaultAllocator()), packrat_allocator(Allocator::DefaultAllocator()) {
+	}
+
+	void Reset() {
+		suggestions.clear();
+		parse_results.Reset();
+		process_allocator.Reset();
+		packrat_allocator.Reset();
+	}
+
+	vector<MatcherSuggestion> suggestions;
+	ParseResultAllocator parse_results;
+	//! The processes of the match, recycled between statements
+	ArenaAllocator process_allocator;
+	//! The packrat cache outlives those processes, so it gets an arena of its own
+	ArenaAllocator packrat_allocator;
 };
 
 template <class PROCESS, class... ARGS>
