@@ -517,6 +517,9 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	AddPackratMemoizedRule("Expression");
 	AddPackratMemoizedRule("Identifier");
 	AddPackratMemoizedRule("ColId");
+	AddPackratMemoizedRule("CatalogQualification");
+	AddPackratMemoizedRule("SchemaQualification");
+	AddPackratMemoizedRule("ReservedSchemaQualification");
 	//===--------------------------------------------------------------------===//
 	// END GENERATED MATCHER RULE FLAGS
 	//===--------------------------------------------------------------------===//

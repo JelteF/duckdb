@@ -1832,6 +1832,9 @@ packrat_memoized_rules:
   - Expression
   - Identifier
   - ColId
+  - CatalogQualification
+  - SchemaQualification
+  - ReservedSchemaQualification
 
 # ---------------------------------------------------------------------------
 # excluded_rules: no transformer stub generated, no semantic value extracted
