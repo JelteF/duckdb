@@ -53,9 +53,11 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformTopLevelStatement(Token
 	}
 	vector<MatcherSuggestion> suggestions;
 	ParseResultAllocator parse_result_allocator;
-	ParserPackratCache packrat_cache;
 	idx_t max_token_index = token_iterator.Position();
 	ArenaAllocator process_allocator(Allocator::DefaultAllocator());
+	// the cache outlives the match processes, so it gets an arena of its own
+	ArenaAllocator packrat_allocator(Allocator::DefaultAllocator());
+	ParserPackratCache packrat_cache(packrat_allocator);
 	MatchContext match_context(suggestions, parse_result_allocator, process_allocator, max_token_index,
 	                           MatchMode::BUILD_PARSE_RESULT, options.identifier_case_mode, &packrat_cache);
 	MatchState state(token_iterator, match_context);
