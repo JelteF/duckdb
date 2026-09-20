@@ -90,6 +90,11 @@ public:
 		vector<reference<const Matcher>> predicate_leaders;
 		bool nullable = false;
 		bool in_progress = false;
+		//! Matching this consumes exactly one token, whichever way it matches
+		bool single_token = false;
+		//! See Matcher::second_literal_id
+		uint16_t second_literal = 0;
+		optional_ptr<const GrammarLiteralTable> second_literal_table;
 	};
 
 	Entry &Compute(const Matcher &matcher) {
@@ -103,6 +108,7 @@ public:
 		entry.in_progress = true;
 		auto set = make_uniq<MatcherStartSet>();
 		bool nullable = false;
+		bool single_token = false;
 		switch (matcher.Type()) {
 		case MatcherType::KEYWORD: {
 			auto &keyword = matcher.Cast<KeywordMatcher>();
@@ -112,23 +118,55 @@ public:
 			} else {
 				entry.predicate_leaders.push_back(matcher);
 			}
+			single_token = true;
 			break;
 		}
-		case MatcherType::CHOICE:
-			for (auto &child : matcher.Cast<ChoiceMatcher>().matchers) {
+		case MatcherType::CHOICE: {
+			auto &alternatives = matcher.Cast<ChoiceMatcher>().matchers;
+			// only when every alternative agrees: the choice matches if any one of them does
+			single_token = !alternatives.empty();
+			bool first = true;
+			for (auto &child : alternatives) {
 				auto &child_entry = Compute(child.get());
 				Merge(*set, entry, child_entry);
 				nullable = nullable || child_entry.nullable;
+				single_token = single_token && child_entry.single_token;
+				if (first) {
+					entry.second_literal = child_entry.second_literal;
+					entry.second_literal_table = child_entry.second_literal_table;
+					first = false;
+				} else if (entry.second_literal != child_entry.second_literal) {
+					entry.second_literal = 0;
+				}
 			}
 			break;
+		}
 		case MatcherType::LIST: {
+			auto &elements = matcher.Cast<ListMatcher>().matchers;
 			nullable = true;
-			for (auto &child : matcher.Cast<ListMatcher>().matchers) {
+			for (auto &child : elements) {
 				auto &child_entry = Compute(child.get());
 				Merge(*set, entry, child_entry);
 				if (!child_entry.nullable) {
 					nullable = false;
 					break;
+				}
+			}
+			if (elements.size() == 1) {
+				// a rule body is a list of one, and passes both properties through
+				auto &only = Compute(elements[0].get());
+				single_token = only.single_token;
+				entry.second_literal = only.second_literal;
+				entry.second_literal_table = only.second_literal_table;
+			} else if (elements.size() > 1) {
+				auto &lead = Compute(elements[0].get());
+				if (lead.single_token) {
+					// the second element starts at the second token, so a literal it must be is one too
+					SetSoleLiteral(entry, Compute(elements[1].get()));
+				} else if (!lead.nullable) {
+					// the list starts with the lead, so the lead's own second token is the list's
+					entry.second_literal = lead.second_literal;
+					entry.second_literal_table = lead.second_literal_table;
 				}
 			}
 			break;
@@ -146,9 +184,13 @@ public:
 		case MatcherType::VARIABLE:
 		case MatcherType::OPERATOR:
 		case MatcherType::NUMBER_LITERAL:
+			// these answer CanStartWith from the token itself
+			entry.predicate_leaders.push_back(matcher);
+			single_token = true;
+			break;
 		case MatcherType::STRING_LITERAL:
 		case MatcherType::END_OF_INPUT:
-			// these answer CanStartWith from the token itself
+			// a string literal can be a sequence of adjacent ones, and end of input consumes nothing
 			entry.predicate_leaders.push_back(matcher);
 			break;
 		default:
@@ -158,14 +200,18 @@ public:
 		// copied, not moved: the entry is memoized and later parents still merge its bits
 		entry.set = std::move(set);
 		entry.nullable = nullable;
+		entry.single_token = single_token;
 		entry.in_progress = false;
 		return entry;
 	}
 
 	unique_ptr<MatcherStartSet> Take(const Matcher &matcher, bool &nullable, vector<uint64_t> &literal_bits,
-	                                 vector<reference<const Matcher>> &leaders) {
+	                                 vector<reference<const Matcher>> &leaders, uint16_t &second_literal,
+	                                 optional_ptr<const GrammarLiteralTable> &second_literal_table) {
 		auto &entry = Compute(matcher);
 		nullable = entry.nullable;
+		second_literal = entry.second_literal;
+		second_literal_table = entry.second_literal_table;
 		literal_bits = entry.literal_bits;
 		leaders = entry.predicate_leaders;
 		return std::move(entry.set);
@@ -178,6 +224,26 @@ private:
 			bits.resize(word + 1, 0);
 		}
 		bits[word] |= uint64_t(1) << (literal_id % 64);
+	}
+
+	//! A matcher that can only match one literal, and has to match: that literal is then known at its position
+	static void SetSoleLiteral(Entry &target, const Entry &source) {
+		if (source.set->any || source.nullable || !source.predicate_leaders.empty()) {
+			return;
+		}
+		uint16_t only = 0;
+		for (idx_t word = 0; word < source.literal_bits.size(); word++) {
+			auto bits = source.literal_bits[word];
+			while (bits) {
+				if (only != 0) {
+					return;
+				}
+				only = NumericCast<uint16_t>(word * 64 + CountZeros<uint64_t>::Trailing(bits));
+				bits &= bits - 1;
+			}
+		}
+		target.second_literal = only;
+		target.second_literal_table = source.set->literal_table;
 	}
 
 	static void Merge(MatcherStartSet &target, Entry &target_entry, const Entry &source) {
@@ -237,7 +303,9 @@ void MatcherAllocator::ComputeStartSets() {
 	for (idx_t i = 0; i < matchers.size(); i++) {
 		vector<uint64_t> literal_bits;
 		vector<reference<const Matcher>> leaders;
-		auto set = builder.Take(*matchers[i], matchers[i]->nullable, literal_bits, leaders);
+		auto set = builder.Take(*matchers[i], matchers[i]->nullable, literal_bits, leaders,
+		                        matchers[i]->second_literal_id, matchers[i]->second_literal_table);
+		D_ASSERT(matchers[i]->second_literal_id == 0 || matchers[i]->second_literal_table);
 		start_sets[i] = *set;
 		bit_offsets[i] = start_set_bits.size();
 		bit_counts[i] = literal_bits.size();
