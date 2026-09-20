@@ -1825,29 +1825,13 @@ collapsible_rules:
   - PrefixExpression
   - BaseExpression
 
+# Only the rules that are genuinely re-entered at the same token are memoized. Counting lookups
+# and hits over a statement covering every expression shape, the rest never hit once - see the
+# commit message - and each one costs a cache row sized to the statement's token count.
 packrat_memoized_rules:
   - Expression
-  - LambdaArrowExpression
-  - LogicalOrExpression
-  - LogicalAndExpression
-  - LogicalNotExpression
-  - IsExpression
-  - ComparisonExpression
-  - BitwiseExpression
-  - AdditiveExpression
-  - MultiplicativeExpression
-  - ExponentiationExpression
-  - PrefixExpression
-  - CollateExpression
-  - AtTimeZoneExpression
-  - SingleExpression
-  - BaseExpression
-  - ParensExpression
-  - ParenthesisExpression
   - Identifier
   - ColId
-  - ColumnReference
-  - FunctionExpression
 
 # ---------------------------------------------------------------------------
 # excluded_rules: no transformer stub generated, no semantic value extracted
