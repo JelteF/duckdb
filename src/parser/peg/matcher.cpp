@@ -83,11 +83,12 @@ namespace {
 class StartSetBuilder {
 public:
 	struct Entry {
-		unique_ptr<MatcherStartSet> set;
+		MatcherStartSet set;
 		//! Literal ids as a bitmap, so that merging up the graph is a word-wise OR. The finished set keeps it.
 		vector<uint64_t> literal_bits;
 		//! Collected while building; ComputeStartSets moves them into the allocator's shared buffer
 		vector<reference<const Matcher>> predicate_leaders;
+		bool computed = false;
 		bool nullable = false;
 		bool in_progress = false;
 		//! Matching this consumes exactly one token, whichever way it matches
@@ -97,9 +98,17 @@ public:
 		optional_ptr<const GrammarLiteralTable> second_literal_table;
 	};
 
+	explicit StartSetBuilder(idx_t matcher_count) : entries(matcher_count) {
+		cycle_entry.set.any = true;
+		cycle_entry.computed = true;
+	}
+
 	Entry &Compute(const Matcher &matcher) {
-		auto &entry = entries[&matcher];
-		if (entry.set) {
+		// the entries are indexed by the matcher's place in the allocator and the vector is never
+		// resized, so the references the recursion holds across a child's Compute stay valid
+		D_ASSERT(matcher.AllocationIndex() < entries.size());
+		auto &entry = entries[matcher.AllocationIndex()];
+		if (entry.computed) {
 			return entry;
 		}
 		if (entry.in_progress) {
@@ -197,24 +206,26 @@ public:
 			set->any = true;
 			break;
 		}
-		// copied, not moved: the entry is memoized and later parents still merge its bits
-		entry.set = std::move(set);
+		entry.set = *set;
+		entry.computed = true;
 		entry.nullable = nullable;
 		entry.single_token = single_token;
 		entry.in_progress = false;
 		return entry;
 	}
 
-	unique_ptr<MatcherStartSet> Take(const Matcher &matcher, bool &nullable, vector<uint64_t> &literal_bits,
-	                                 vector<reference<const Matcher>> &leaders, uint16_t &second_literal,
-	                                 optional_ptr<const GrammarLiteralTable> &second_literal_table) {
+	//! Hands a finished entry to ComputeStartSets. Every entry is taken once, after the whole graph has
+	//! been computed, so nothing merges from it afterwards and its buffers are moved rather than copied.
+	MatcherStartSet Take(const Matcher &matcher, bool &nullable, vector<uint64_t> &literal_bits,
+	                     vector<reference<const Matcher>> &leaders, uint16_t &second_literal,
+	                     optional_ptr<const GrammarLiteralTable> &second_literal_table) {
 		auto &entry = Compute(matcher);
 		nullable = entry.nullable;
 		second_literal = entry.second_literal;
 		second_literal_table = entry.second_literal_table;
-		literal_bits = entry.literal_bits;
-		leaders = entry.predicate_leaders;
-		return std::move(entry.set);
+		literal_bits = std::move(entry.literal_bits);
+		leaders = std::move(entry.predicate_leaders);
+		return entry.set;
 	}
 
 private:
@@ -228,7 +239,7 @@ private:
 
 	//! A matcher that can only match one literal, and has to match: that literal is then known at its position
 	static void SetSoleLiteral(Entry &target, const Entry &source) {
-		if (source.set->any || source.nullable || !source.predicate_leaders.empty()) {
+		if (source.set.any || source.nullable || !source.predicate_leaders.empty()) {
 			return;
 		}
 		uint16_t only = 0;
@@ -243,11 +254,11 @@ private:
 			}
 		}
 		target.second_literal = only;
-		target.second_literal_table = source.set->literal_table;
+		target.second_literal_table = source.set.literal_table;
 	}
 
 	static void Merge(MatcherStartSet &target, Entry &target_entry, const Entry &source) {
-		auto &set = *source.set;
+		auto &set = source.set;
 		if (set.any) {
 			target.any = true;
 		}
@@ -274,20 +285,16 @@ private:
 		}
 	}
 
-	StartSetBuilder() {
-		cycle_entry.set = make_uniq<MatcherStartSet>();
-		cycle_entry.set->any = true;
-	}
 	friend class duckdb::MatcherAllocator;
 
-	unordered_map<const Matcher *, Entry> entries;
+	vector<Entry> entries;
 	Entry cycle_entry;
 };
 
 } // namespace
 
 void MatcherAllocator::ComputeStartSets() {
-	StartSetBuilder builder;
+	StartSetBuilder builder(matchers.size());
 	// compute everything first: Take moves the set out, and a matcher's set must stay available while the matchers
 	// that reference it are still being computed
 	for (auto &matcher : matchers) {
@@ -303,10 +310,9 @@ void MatcherAllocator::ComputeStartSets() {
 	for (idx_t i = 0; i < matchers.size(); i++) {
 		vector<uint64_t> literal_bits;
 		vector<reference<const Matcher>> leaders;
-		auto set = builder.Take(*matchers[i], matchers[i]->nullable, literal_bits, leaders,
-		                        matchers[i]->second_literal_id, matchers[i]->second_literal_table);
+		start_sets[i] = builder.Take(*matchers[i], matchers[i]->nullable, literal_bits, leaders,
+		                             matchers[i]->second_literal_id, matchers[i]->second_literal_table);
 		D_ASSERT(matchers[i]->second_literal_id == 0 || matchers[i]->second_literal_table);
-		start_sets[i] = *set;
 		bit_offsets[i] = start_set_bits.size();
 		bit_counts[i] = literal_bits.size();
 		start_set_bits.insert(start_set_bits.end(), literal_bits.begin(), literal_bits.end());
@@ -334,6 +340,7 @@ PrecedenceLadder &MatcherAllocator::AddLadder(unique_ptr<PrecedenceLadder> ladde
 
 Matcher &MatcherAllocator::Allocate(unique_ptr<Matcher> matcher) {
 	auto &result = *matcher;
+	result.allocation_index = NumericCast<uint32_t>(matchers.size());
 	matchers.push_back(std::move(matcher));
 	return result;
 }
