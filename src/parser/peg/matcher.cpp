@@ -95,6 +95,7 @@ class StartSetBuilder {
 public:
 	struct Entry {
 		unique_ptr<MatcherStartSet> set;
+		bool computed = false;
 		//! Literal ids as a bitmap while building, so that merging up the graph is a word-wise OR rather than a
 		//! sort of ever larger id lists
 		vector<uint64_t> literal_bits;
@@ -102,14 +103,19 @@ public:
 		bool in_progress = false;
 	};
 
-	explicit StartSetBuilder(const GrammarLiteralTable &literal_table) : literal_table(literal_table) {
+	StartSetBuilder(idx_t matcher_count, const GrammarLiteralTable &literal_table)
+	    : literal_table(literal_table), entries(matcher_count) {
 		cycle_entry.set = make_uniq<MatcherStartSet>();
 		cycle_entry.set->any = true;
+		cycle_entry.computed = true;
 	}
 
 	Entry &Compute(const Matcher &matcher) {
-		auto &entry = entries[&matcher];
-		if (entry.set) {
+		// the entries are indexed by the matcher's place in the allocator and the vector is never resized,
+		// so the references the recursion holds across a child's Compute stay valid
+		D_ASSERT(matcher.AllocationIndex() < entries.size());
+		auto &entry = entries[matcher.AllocationIndex()];
+		if (entry.computed) {
 			return entry;
 		}
 		if (entry.in_progress) {
@@ -184,6 +190,7 @@ public:
 		}
 		set->nullable = nullable;
 		entry.set = std::move(set);
+		entry.computed = true;
 		entry.nullable = nullable;
 		entry.in_progress = false;
 		return entry;
@@ -231,14 +238,14 @@ private:
 	}
 
 	const GrammarLiteralTable &literal_table;
-	unordered_map<const Matcher *, Entry> entries;
+	vector<Entry> entries;
 	Entry cycle_entry;
 };
 
 } // namespace
 
 void MatcherAllocator::ComputeStartSets(const GrammarLiteralTable &literal_table) {
-	StartSetBuilder builder(literal_table);
+	StartSetBuilder builder(matchers.size(), literal_table);
 	// compute everything first: Take moves the set out, and a matcher's set must stay available while the matchers
 	// that reference it are still being computed
 	for (auto &matcher : matchers) {
@@ -253,6 +260,7 @@ void MatcherAllocator::ComputeStartSets(const GrammarLiteralTable &literal_table
 Matcher &MatcherAllocator::Allocate(unique_ptr<Matcher> matcher) {
 	D_ASSERT(!start_sets_computed);
 	auto &result = *matcher;
+	result.allocation_index = NumericCast<uint32_t>(matchers.size());
 	result.packrat_id = optional_idx(matchers.size());
 	matchers.push_back(std::move(matcher));
 	return result;
