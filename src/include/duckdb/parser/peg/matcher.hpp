@@ -342,6 +342,9 @@ public:
 	void SetPackratMemoized() {
 		packrat_memoized = true;
 	}
+	idx_t AllocationIndex() const {
+		return allocation_index;
+	}
 	bool IsPackratMemoized() const {
 		return packrat_memoized;
 	}
@@ -379,6 +382,9 @@ protected:
 	bool collapsible = false;
 	optional_ptr<const CompiledGrammarRule> rule;
 	unique_ptr<MatcherStartSet> start_set;
+	//! Position in MatcherAllocator::matchers, so a pass over the graph can index its own state by matcher
+	//! instead of hashing the pointer
+	uint32_t allocation_index = NumericLimits<uint32_t>::Maximum();
 };
 
 class AtomicMatcher : public Matcher {
