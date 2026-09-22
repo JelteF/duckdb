@@ -13,10 +13,11 @@ namespace duckdb {
 
 CompiledGrammar::CompiledGrammar(MatcherAllocator &&allocator_p, unique_ptr<PEGKeywordHelper> &&keyword_helper_p,
                                  unique_ptr<Tokenizer> &&tokenizer_p, compiled_rules_map_t &&rules_p,
-                                 const Matcher &program_matcher, const Matcher &top_level_statement_matcher)
+                                 const Matcher &program_matcher, const Matcher &top_level_statement_matcher,
+                                 idx_t packrat_matcher_count_p)
     : allocator(std::move(allocator_p)), keyword_helper(std::move(keyword_helper_p)), tokenizer(std::move(tokenizer_p)),
       rules(std::move(rules_p)), program_matcher(program_matcher),
-      top_level_statement_matcher(top_level_statement_matcher) {
+      top_level_statement_matcher(top_level_statement_matcher), packrat_matcher_count(packrat_matcher_count_p) {
 }
 
 shared_ptr<CompiledGrammar> CompiledGrammar::Get(ClientContext &context) {
@@ -154,7 +155,8 @@ CompiledGrammar::Create(const case_insensitive_map_t<reference<GrammarExtension>
 	compiled_rules_map_t rules;
 	for (auto &entry : grammar.rules) {
 		auto &rule = *entry.second;
-		rules.emplace(rule.name, make_uniq<CompiledGrammarRule>(rule.name, rule.transform_process));
+		rules.emplace(rule.name, make_uniq<CompiledGrammarRule>(rule.name, rule.transform_process, rule.generated_ops,
+		                                                        rule.childless_transform));
 	}
 
 	MatcherAllocator allocator;
@@ -163,11 +165,12 @@ CompiledGrammar::Create(const case_insensitive_map_t<reference<GrammarExtension>
 
 	auto &program_matcher = factory.CreateRootMatcher("Program");
 	auto &top_level_statement_matcher = factory.GetMatcher("TopLevelStatement");
+	allocator.ComputeStartSets();
+	factory.IndexStartSets();
 
-	auto new_matcher = shared_ptr<CompiledGrammar>(new CompiledGrammar(std::move(allocator), std::move(keyword_helper),
-	                                                                   std::move(tokenizer), std::move(rules),
-	                                                                   program_matcher, top_level_statement_matcher));
-	return new_matcher;
+	return shared_ptr<CompiledGrammar>(new CompiledGrammar(std::move(allocator), std::move(keyword_helper),
+	                                                       std::move(tokenizer), std::move(rules), program_matcher,
+	                                                       top_level_statement_matcher, factory.PackratMatcherCount()));
 }
 
 shared_ptr<CompiledGrammar> CompiledGrammar::Create() {

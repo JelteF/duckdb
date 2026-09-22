@@ -46,7 +46,7 @@
 # ---------------------------------------------------------------------------
 
 additional_transform_result_types:
-  - "unique_ptr<TransformResultValue>"
+  - "transform_result_ptr"
   - "vector<Identifier>"
 
 SQLStatementList:
@@ -1802,29 +1802,39 @@ matcher_rule_overrides:
     allow_type_overlap: true
     matcher: all_operators
 
-packrat_memoized_rules:
+# collapsible_rules: rules of the form `X <- Y`, `X <- Y Tail*`, `X <- Y Tail?` or `X <- Prefix? Y`
+# whose transformer returns Y's result unchanged when the rest of the rule matched nothing. When such
+# a rule matches only Y, the matcher hands out Y's parse result instead of wrapping it.
+collapsible_rules:
   - Expression
   - LambdaArrowExpression
   - LogicalOrExpression
   - LogicalAndExpression
   - LogicalNotExpression
   - IsExpression
+  - IsDistinctFromExpression
   - ComparisonExpression
+  - BetweenInLikeExpression
+  - OtherOperatorExpression
   - BitwiseExpression
   - AdditiveExpression
   - MultiplicativeExpression
   - ExponentiationExpression
-  - PrefixExpression
   - CollateExpression
   - AtTimeZoneExpression
-  - SingleExpression
+  - PrefixExpression
   - BaseExpression
-  - ParensExpression
-  - ParenthesisExpression
+
+# Only the rules that are genuinely re-entered at the same token are memoized. Counting lookups
+# and hits over a statement covering every expression shape, the rest never hit once - see the
+# commit message - and each one costs a cache row sized to the statement's token count.
+packrat_memoized_rules:
+  - Expression
   - Identifier
   - ColId
-  - ColumnReference
-  - FunctionExpression
+  - CatalogQualification
+  - SchemaQualification
+  - ReservedSchemaQualification
 
 # ---------------------------------------------------------------------------
 # excluded_rules: no transformer stub generated, no semantic value extracted

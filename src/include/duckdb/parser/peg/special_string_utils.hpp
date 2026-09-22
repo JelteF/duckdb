@@ -1,4 +1,6 @@
 #pragma once
+
+#include <string_view>
 #include "duckdb/common/common.hpp"
 
 namespace duckdb {
@@ -10,7 +12,7 @@ struct SpecialStringInfo {
 	idx_t prefix_len;
 };
 
-inline SpecialStringInfo GetSpecialStringInfo(const string &text) {
+inline SpecialStringInfo GetSpecialStringInfo(std::string_view text) {
 	if (text.empty()) {
 		return {SpecialStringCharacter::STANDARD, 0};
 	}

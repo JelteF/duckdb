@@ -13,6 +13,7 @@ TokenIterator::TokenIterator(unique_ptr<vector<MatcherToken>> owned_tokens_p)
 	for (auto &token : tokens) {
 		token.ResetLiteralInfo();
 	}
+	InitializeAutocompleteCursor();
 }
 
 TokenIterator::TokenIterator(vector<MatcherToken> &tokens_p) : tokens(tokens_p) {
@@ -20,18 +21,12 @@ TokenIterator::TokenIterator(vector<MatcherToken> &tokens_p) : tokens(tokens_p) 
 	for (auto &token : tokens) {
 		token.ResetLiteralInfo();
 	}
-}
-
-TokenIterator::TokenIterator(const TokenIterator &other) : tokens(other.tokens), position(other.position) {
+	InitializeAutocompleteCursor();
 }
 
 TokenIterator::TokenIterator(TokenIterator &&other) noexcept
-    : owned_tokens(std::move(other.owned_tokens)), tokens(other.tokens), position(other.position) {
-}
-
-bool TokenIterator::AtEnd() const {
-	auto current = Current();
-	return !current || current->type == TokenType::END_OF_INPUT;
+    : owned_tokens(std::move(other.owned_tokens)), tokens(other.tokens), position(other.position),
+      has_autocomplete_cursor(other.has_autocomplete_cursor) {
 }
 
 bool TokenIterator::HasMoreStatements() const {
@@ -47,27 +42,12 @@ bool TokenIterator::HasMoreStatements() const {
 	return false;
 }
 
-idx_t TokenIterator::Position() const {
-	return position;
-}
-
-idx_t TokenIterator::Size() const {
-	return tokens.size();
-}
-
 idx_t TokenIterator::EndOffset() const {
 	if (tokens.empty()) {
 		return 0;
 	}
 	auto &last_token = tokens.back();
 	return last_token.offset + last_token.length;
-}
-
-optional_ptr<const MatcherToken> TokenIterator::Current() const {
-	if (position >= tokens.size()) {
-		return nullptr;
-	}
-	return tokens[position];
 }
 
 const MatcherToken &TokenIterator::Previous() const {
@@ -92,18 +72,12 @@ void TokenIterator::Advance(idx_t count) {
 	position += count;
 }
 
-void TokenIterator::SetPosition(idx_t position_p) {
-	if (position_p > tokens.size()) {
-		throw InternalException("Token position %llu is out of range (size %llu)", position_p, tokens.size());
-	}
-	position = position_p;
+void TokenIterator::ThrowPositionOutOfRange(idx_t position_p) const {
+	throw InternalException("Token position %llu is out of range (size %llu)", position_p, tokens.size());
 }
 
-void TokenIterator::SetPosition(const TokenIterator &other) {
-	if (&tokens != &other.tokens) {
-		throw InternalException("Cannot set TokenIterator position from a different token collection");
-	}
-	SetPosition(other.position);
+void TokenIterator::ThrowForeignTokens() const {
+	throw InternalException("Cannot set TokenIterator position from a different token collection");
 }
 
 void TokenIterator::SetPreviousTokenType(TokenType type) {
@@ -117,7 +91,7 @@ vector<SimpleToken> TokenIterator::RemainingTokens() const {
 	vector<SimpleToken> result;
 	result.reserve(tokens.size() - position);
 	for (idx_t index = position; index < tokens.size(); index++) {
-		result.emplace_back(tokens[index].text, tokens[index].type);
+		result.emplace_back(string {tokens[index].text}, tokens[index].type);
 	}
 	return result;
 }
@@ -125,7 +99,7 @@ vector<SimpleToken> TokenIterator::RemainingTokens() const {
 string TokenIterator::ToString() const {
 	string result;
 	for (auto &token : tokens) {
-		result += token.text + " ";
+		result += string {token.text} + " ";
 	}
 	return result;
 }

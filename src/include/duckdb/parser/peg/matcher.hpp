@@ -16,6 +16,7 @@
 #include "duckdb/common/enums/identifier_case_mode.hpp"
 #include "duckdb/parser/parser_extension.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
+#include "duckdb/common/bit_utils.hpp"
 #include "duckdb/parser/token_iterator.hpp"
 #include "duckdb/parser/peg/parser_packrat.hpp"
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
@@ -27,9 +28,12 @@ namespace duckdb {
 class ClientContext;
 class PEGTransformerFactory;
 class ParseResultAllocator;
+struct CompiledGrammarRule;
+struct CompiledGrammar;
 class Matcher;
 class MatcherAllocator;
 class MatchProcess;
+struct PrecedenceLadder;
 
 enum class SuggestionState : uint8_t {
 	SUGGEST_KEYWORD,
@@ -164,6 +168,13 @@ struct MatchContext {
 	IdentifierCaseMode identifier_case_mode;
 	ParserPackratCache *packrat_cache;
 	MatchMode mode;
+
+	//! An optional that matched nothing carries no information at all: no rule, no name and no source location. One
+	//! instance per match run therefore stands in for all of them.
+	optional_ptr<ParseResult> EmptyOptionalResult();
+
+private:
+	optional_ptr<ParseResult> empty_optional;
 };
 
 struct MatchState {
@@ -189,6 +200,11 @@ struct MatchState {
 	template <class PROCESS, class... ARGS>
 	arena_ptr<MatchProcess> Make(ARGS &&... args);
 
+	void UpdateMaxTokenIndexTo(idx_t token_index) {
+		if (token_index > context.max_token_index) {
+			context.max_token_index = token_index;
+		}
+	}
 	void UpdateMaxTokenIndex() {
 		if (token_iterator.Position() > context.max_token_index) {
 			context.max_token_index = token_iterator.Position();
@@ -223,31 +239,46 @@ struct MatchInput {
 };
 
 //! Essentially a std::variant<MatchInput, MatcherResult>
-//! Produced by a MatchProcess::Resume call, controlling the next step in the execution
+//! Produced by a MatchProcess::Resume call, controlling the next step in the execution. Kept to a trivially copyable
+//! pair of pointers and a result: one of these is returned for every step of every frame.
 class MatchStep {
 public:
-	static MatchStep Child(MatchInput input);
-	static MatchStep Complete(MatcherResult result);
+	static MatchStep Child(MatchInput input) {
+		return MatchStep(&input.matcher, &input.state, MatcherResult::Failure());
+	}
+	static MatchStep Complete(MatcherResult result) {
+		return MatchStep(nullptr, nullptr, result);
+	}
 
-	optional<MatchInput> GetChild();
-	MatcherResult GetResult() const;
-
-private:
-	MatchStep(optional<MatchInput> child_p, optional<MatcherResult> result_p)
-	    : child(std::move(child_p)), result(result_p) {
+	bool HasChild() const {
+		return child_matcher != nullptr;
+	}
+	MatchInput GetChild() const {
+		D_ASSERT(child_matcher && child_state);
+		return MatchInput {*child_matcher, *child_state};
+	}
+	MatcherResult GetResult() const {
+		D_ASSERT(!child_matcher);
+		return result;
 	}
 
 private:
-	optional<MatchInput> child;
-	optional<MatcherResult> result;
+	MatchStep(const Matcher *child_matcher_p, MatchState *child_state_p, MatcherResult result_p)
+	    : child_matcher(child_matcher_p), child_state(child_state_p), result(result_p) {
+	}
+
+private:
+	const Matcher *child_matcher;
+	MatchState *child_state;
+	MatcherResult result;
 };
 
 class MatchProcess {
 public:
 	virtual ~MatchProcess() = default;
 
-	//! Resume matching, optionally with the result of the previously requested child.
-	virtual MatchStep Resume(optional<MatcherResult> child_result) = 0;
+	//! Resume matching, with the result of the previously requested child or nullptr on the first call.
+	virtual MatchStep Resume(const MatcherResult *child_result) = 0;
 };
 
 enum class MatcherType {
@@ -264,6 +295,44 @@ enum class MatcherType {
 	CUSTOM
 };
 
+//! Which tokens a matcher can start with, computed once per grammar by MatcherAllocator::ComputeStartSets. Used by
+//! Matcher::MayMatchHere to skip matchers that cannot match at the current token without pushing a frame for them.
+struct MatcherStartSet {
+	//! Anything may start this matcher (custom or untyped atomic matchers, or a cycle in the grammar): never prune
+	bool any = false;
+	optional_ptr<const GrammarLiteralTable> literal_table;
+	//! One bit per literal id that can start the matcher. The grammar numbers its literals densely, so an id indexes
+	//! this directly: the answer is exact and takes one test, where a sorted list took a search and a bloom filter
+	//! to keep the common miss cheap. The words live in MatcherAllocator::start_set_bits, one buffer for the whole
+	//! grammar, so reaching them is a load from a contiguous region rather than a chase into a node of its own.
+	const uint64_t *literal_words = nullptr;
+	uint32_t literal_word_count = 0;
+	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher. Like the bitmap,
+	//! these live in one buffer for the whole grammar rather than a vector per set.
+	const reference<const Matcher> *leaders = nullptr;
+	uint32_t leader_count = 0;
+
+	bool HasLiteral(uint16_t literal_id) const {
+		auto word = static_cast<idx_t>(literal_id) / 64;
+		if (word >= literal_word_count) {
+			return false;
+		}
+		return (literal_words[word] & (uint64_t(1) << (literal_id % 64))) != 0;
+	}
+
+	template <class FUNC>
+	void ForEachLiteral(FUNC &&callback) const {
+		for (idx_t word = 0; word < literal_word_count; word++) {
+			auto bits = literal_words[word];
+			while (bits) {
+				auto bit = CountZeros<uint64_t>::Trailing(bits);
+				callback(static_cast<uint16_t>(word * 64 + bit));
+				bits &= bits - 1;
+			}
+		}
+	}
+};
+
 class Matcher {
 public:
 	explicit Matcher(MatcherType type = MatcherType::CUSTOM) : type(type) {
@@ -276,6 +345,68 @@ public:
 	virtual arena_ptr<MatchProcess> StartMatch(MatchState &state) const = 0;
 	virtual bool IsAtomic() const {
 		return false;
+	}
+	//! Cheap, conservative pre-check used to skip matchers that cannot possibly match at the current token, without
+	//! pushing a frame for them. Returns false only when a match is certainly impossible; anything unsure (custom
+	//! matchers, nullable children, deep nesting) answers true. Never prunes at the autocomplete cursor, where the
+	//! failing children are what produce the suggestions.
+	//! Inline: asked for nearly every child the matcher considers, and answered from the start set without a call
+	bool MayMatchHere(MatchState &state) const {
+		if (!MayStartHere(state)) {
+			return false;
+		}
+		if (second_literal_id == 0 || state.token_iterator.HasAutocompleteCursor()) {
+			return true;
+		}
+		// the first token can start this, but the second rules it out - a qualified name at an unqualified one.
+		// The token was examined, so it counts as reached: a syntax error here points at it and not before it.
+		if (state.token_iterator.LiteralInfoAt(1, *second_literal_table).LiteralId() == second_literal_id) {
+			return true;
+		}
+		state.UpdateMaxTokenIndexTo(state.token_iterator.Position() + 1);
+		return false;
+	}
+
+	//! The start-set half of MayMatchHere: can the token the matcher is at start it at all
+	bool MayStartHere(MatchState &state) const {
+		auto token = state.token_iterator.Current();
+		if (!token) {
+			return true;
+		}
+		// never prune at the auto-complete cursor, where the failing children are what produce the suggestions
+		if (state.token_iterator.HasAutocompleteCursor() && token->type == TokenType::END_OF_INPUT_AUTOCOMPLETE) {
+			return true;
+		}
+		if (!start_set_computed) {
+			return CanStartWith(state, 0);
+		}
+		auto set = &start_set;
+		if (set->any) {
+			return true;
+		}
+		if (set->literal_word_count != 0) {
+			auto literal_id = state.token_iterator.CurrentLiteralInfo(*set->literal_table).LiteralId();
+			if (literal_id && set->HasLiteral(literal_id)) {
+				return true;
+			}
+		}
+		if (set->leader_count == 0) {
+			return false;
+		}
+		return MatchesPredicateLeader(state, *set);
+	}
+	//! The uncommon half of MayMatchHere: a matcher that identifiers or operators can start
+	bool MatchesPredicateLeader(MatchState &state, const MatcherStartSet &set) const;
+	//! Token predicate for atomic matchers, consulted through the start sets; composite matchers never override it
+	virtual bool CanStartWith(MatchState &state, idx_t depth) const {
+		return true;
+	}
+	bool IsNullable() const {
+		return nullable;
+	}
+	//! The tokens this matcher can start with, or null before MatcherAllocator::ComputeStartSets ran
+	optional_ptr<const MatcherStartSet> GetStartSet() const {
+		return start_set_computed ? optional_ptr<const MatcherStartSet>(start_set) : nullptr;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;
@@ -299,14 +430,31 @@ public:
 		return !name.empty();
 	}
 	string GetName() const;
+	//! The stored name, which lives as long as the grammar and can therefore be referenced by a parse result
+	const string &GetNameRef() const {
+		return name;
+	}
 	optional_idx GetPackratId() const {
 		return packrat_id;
 	}
-	void SetPackratMemoized() {
+	//! Mark the matcher as memoized. The id is a dense index over the memoized matchers of a grammar and is used
+	//! to index directly into the packrat cache.
+	void SetPackratMemoized(idx_t packrat_id_p) {
 		packrat_memoized = true;
+		packrat_id = optional_idx(packrat_id_p);
+	}
+	idx_t AllocationIndex() const {
+		return allocation_index;
 	}
 	bool IsPackratMemoized() const {
 		return packrat_memoized;
+	}
+	//! See MatcherFactory::AddCollapsibleRule
+	void SetCollapsible() {
+		collapsible = true;
+	}
+	bool IsCollapsible() const {
+		return collapsible;
 	}
 
 public:
@@ -332,7 +480,24 @@ protected:
 	string name;
 	optional_idx packrat_id;
 	bool packrat_memoized = false;
+	//! The literal that has to follow this matcher's first token, when the grammar guarantees one: the matcher
+	//! begins with an element that always consumes exactly one token, and only this literal can follow it. Zero
+	//! when there is no such guarantee. See StartSetBuilder.
+	uint16_t second_literal_id = 0;
+	optional_ptr<const GrammarLiteralTable> second_literal_table;
+	bool collapsible = false;
 	optional_ptr<const CompiledGrammarRule> rule;
+	//! See MatcherStartSet; null until MatcherAllocator::ComputeStartSets ran (MayMatchHere then falls back to the
+	//! matcher's own CanStartWith)
+	//! Held by value rather than behind a pointer: the check that reads it runs 24,684 times per statement, and what
+	//! that check waits on is the chain of loads to reach the bits, not the size of a matcher.
+	MatcherStartSet start_set;
+	bool start_set_computed = false;
+	bool nullable = false;
+	//! Position in MatcherAllocator::matchers, so a pass over the graph can index its own state by matcher
+	//! instead of hashing the pointer. Read only while the grammar is built, so it sits away from the fields
+	//! the match reads.
+	uint32_t allocation_index = NumericLimits<uint32_t>::Maximum();
 };
 
 class AtomicMatcher : public Matcher {
@@ -363,17 +528,91 @@ public:
 class MatcherAllocator {
 public:
 	Matcher &Allocate(unique_ptr<Matcher> matcher);
+	//! Compute MatcherStartSet for every allocated matcher. Called once the matcher graph of a grammar is complete.
+	void ComputeStartSets();
+	//! Take ownership of a precedence ladder, which lives as long as the matchers that refer to it
+	PrecedenceLadder &AddLadder(unique_ptr<PrecedenceLadder> ladder);
+	//! Fuse the element of every repeat that is written as `(Atom X)*` into the repeat itself
+	void FuseRepeatElements();
 
 private:
 	vector<unique_ptr<Matcher>> matchers;
+	vector<unique_ptr<PrecedenceLadder>> ladders;
+	//! Every matcher's start set, and every start set's literal bitmap, each in one contiguous buffer. The matcher
+	//! graph is walked at random, so what costs is the chase into a scattered node, not the bytes.
+	vector<MatcherStartSet> start_sets;
+	vector<uint64_t> start_set_bits;
+	vector<reference<const Matcher>> start_set_leaders;
 };
 
+//! Owns the parse results of one match run. Results are carved out of an arena instead of being allocated one by
+//! one: a parse creates a result per matched rule and freeing them all at the end is the only lifetime needed.
 class ParseResultAllocator {
 public:
-	optional_ptr<ParseResult> Allocate(unique_ptr<ParseResult> parse_result);
+	ParseResultAllocator();
+	~ParseResultAllocator();
+
+	template <class RESULT, class... ARGS>
+	optional_ptr<ParseResult> Make(ARGS &&... args) {
+		static_assert(std::is_base_of<ParseResult, RESULT>::value, "Expected a parse result");
+		auto result = arena.Make<RESULT>(std::forward<ARGS>(args)...);
+		if (RESULT::NEEDS_DESTRUCTOR) {
+			parse_results.emplace_back(result);
+		}
+		return optional_ptr<ParseResult>(result);
+	}
+
+	//! Copy a collected set of children into the arena, where it lives as long as the results it belongs to
+	ParseResultChildren MakeChildren(const reference<ParseResult> *children, idx_t count) {
+		if (count == 0) {
+			return ParseResultChildren();
+		}
+		arena.AlignNext();
+		auto target =
+		    reinterpret_cast<reference<ParseResult> *>(arena.Allocate(count * sizeof(reference<ParseResult>)));
+		memcpy(static_cast<void *>(target), static_cast<const void *>(children),
+		       count * sizeof(reference<ParseResult>));
+		return ParseResultChildren(target, count);
+	}
+
+	//! Drop everything this allocator handed out. The results of one statement are dead once it
+	//! has been transformed, so a query of many statements can reuse the arena instead of taking
+	//! a new one per statement.
+	void Reset() {
+		parse_results.clear();
+		arena.Reset();
+	}
 
 private:
-	vector<unique_ptr<ParseResult>> parse_results;
+	ArenaAllocator arena;
+	//! Only tracked to run the destructors; the memory itself belongs to the arena
+	vector<arena_ptr<ParseResult>> parse_results;
+};
+
+//! The per-statement scratch of a parse. Held for the whole query so that a script of many
+//! statements does not build and tear it down once per statement.
+struct ParserScratch {
+	ParserScratch()
+	    : process_allocator(Allocator::DefaultAllocator()), packrat_allocator(Allocator::DefaultAllocator()) {
+	}
+
+	void Reset() {
+		suggestions.clear();
+		parse_results.Reset();
+		process_allocator.Reset();
+		packrat_allocator.Reset();
+	}
+
+	vector<MatcherSuggestion> suggestions;
+	ParseResultAllocator parse_results;
+	//! The processes of the match, recycled between statements
+	ArenaAllocator process_allocator;
+	//! The packrat cache outlives those processes, so it gets an arena of its own
+	ArenaAllocator packrat_allocator;
+	//! Rule lookups by name, kept across statements: the names are the grammar's own string
+	//! literals, so the pointers stay valid as long as the grammar the cache was built for.
+	unordered_map<const char *, reference<const CompiledGrammarRule>> rule_cache;
+	optional_ptr<const CompiledGrammar> rule_cache_grammar;
 };
 
 template <class PROCESS, class... ARGS>
@@ -387,10 +626,10 @@ MatcherResult MatchState::AllocateParseResult(ARGS &&... args) {
 	if (!BuildParseResult()) {
 		return MatcherResult::Success();
 	}
-	auto result = context.allocator.Allocate(make_uniq<RESULT>(std::forward<ARGS>(args)...));
+	auto result = context.allocator.Make<RESULT>(std::forward<ARGS>(args)...);
 	if (rule) {
 		result->SetRule(*rule);
-		result->name = rule->name;
+		result->SetName(rule->name);
 	}
 	return MatcherResult::Success(result);
 }

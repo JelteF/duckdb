@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "duckdb/parser/peg/tokenizer/tokenizer.hpp"
 #include "duckdb/parser/peg/keyword_helper.hpp"
 #include "duckdb/parser/peg/matcher.hpp"
@@ -27,9 +29,9 @@ public:
 			return MatcherResult::Failure();
 		}
 		state.token_iterator.SetPreviousTokenType(TokenType::NUMBER_LITERAL);
-		auto result = state.AllocateParseResult<NumberParseResult>(token_text, start_offset, token_length);
+		auto result = state.AllocateParseResult<NumberParseResult>(string {token_text}, start_offset, token_length);
 		if (result.HasParseResult()) {
-			result.GetParseResult()->name = name;
+			result.GetParseResult()->SetName(name);
 		}
 		return result;
 	}
@@ -42,7 +44,21 @@ public:
 		return "NUMBER_LITERAL";
 	}
 
+	bool CanStartWith(MatchState &state, idx_t depth) const override {
+		auto token = state.token_iterator.Current();
+		return token && StartsNumberLiteral(token->text);
+	}
+
 private:
+	//! The cheap half of MatchNumberLiteral: only a token starting with a digit or a '.' can be a number
+	static bool StartsNumberLiteral(std::string_view token_text) {
+		if (token_text.empty() || !Tokenizer::CharacterIsInitialNumber(token_text[0])) {
+			return false;
+		}
+		// A lone '.' is a dot operator, not a number literal (e.g., '?.method()' should not consume '.')
+		return !(token_text.size() == 1 && token_text[0] == '.');
+	}
+
 	static bool MatchNumberLiteral(MatchState &state) {
 		auto token = state.token_iterator.Current();
 		if (!token) {

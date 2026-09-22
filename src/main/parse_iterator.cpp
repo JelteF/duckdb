@@ -95,7 +95,10 @@ bool ParseIterator::Peek() {
 		}
 		unique_ptr<SQLStatement> stmt;
 		try {
-			stmt = parser->ParseTopLevelStatement(*token_iterator);
+			if (!scratch) {
+				scratch = make_uniq<ParserScratch>();
+			}
+			stmt = parser->ParseTopLevelStatement(*token_iterator, *scratch);
 		} catch (ParserException &) {
 			// Mirror Parser::ParseQuery's parse_function-extension fallback so extensions like
 			// `quack` can claim a segment that PEG couldn't parse.

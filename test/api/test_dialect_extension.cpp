@@ -86,23 +86,27 @@ TEST_CASE("Dialect tokenizer hooks are opt-in", "[api][dialect_extension]") {
 	Tokenizer default_tokenizer(helper);
 	HookTokenizer hook_tokenizer(helper, true, true, true);
 
-	auto default_backtick = Tokenize(default_tokenizer, "`a b`");
-	auto hooked_backtick = Tokenize(hook_tokenizer, "`a b`");
+	// the tokens point into the string they were tokenized from, so it has to outlive them
+	const string backtick_sql = "`a b`";
+	auto default_backtick = Tokenize(default_tokenizer, backtick_sql);
+	auto hooked_backtick = Tokenize(hook_tokenizer, backtick_sql);
 	REQUIRE(default_backtick.size() > 2);
 	REQUIRE(hooked_backtick.size() >= 1);
 	REQUIRE(hooked_backtick[0].type == TokenType::IDENTIFIER);
 	REQUIRE(hooked_backtick[0].text == "`a b`");
 
-	auto default_operator = Tokenize(default_tokenizer, ">>=");
-	auto hooked_operator = Tokenize(hook_tokenizer, ">>=");
+	const string operator_sql = ">>=";
+	auto default_operator = Tokenize(default_tokenizer, operator_sql);
+	auto hooked_operator = Tokenize(hook_tokenizer, operator_sql);
 	REQUIRE(default_operator.size() >= 1);
 	REQUIRE(default_operator[0].text == ">>=");
 	REQUIRE(default_operator.size() >= 2);
 	REQUIRE(hooked_operator[0].text == ">");
 	REQUIRE(hooked_operator[1].text == ">=");
 
-	auto default_string = Tokenize(default_tokenizer, "'a\\'b'");
-	auto hooked_string = Tokenize(hook_tokenizer, "'a\\'b'");
+	const string string_sql = "'a\\'b'";
+	auto default_string = Tokenize(default_tokenizer, string_sql);
+	auto hooked_string = Tokenize(hook_tokenizer, string_sql);
 	REQUIRE(default_string.size() > 2);
 	REQUIRE(hooked_string[0].text == "'a\\'b'");
 }
