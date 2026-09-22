@@ -20,10 +20,6 @@ void ThrowNullArrayPtrConstruction() {
 	throw InternalException("Attempted to construct an array_ptr from a NULL pointer");
 }
 
-void ThrowArrayPtrIteratorOutOfRange() {
-	throw InternalException("array_ptr iterator dereferenced while iterator is out of range");
-}
-
 void ThrowVectorIndexOutOfBounds(idx_t index, idx_t size) {
 	throw InternalException("Attempted to access index %lld within vector of size %lld", index, size);
 }

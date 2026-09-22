@@ -27,7 +27,6 @@ struct MemorySafety {
 [[noreturn]] DUCKDB_API void ThrowNullSharedPtrDereference();
 [[noreturn]] DUCKDB_API void ThrowOptionalPointerNotSet();
 [[noreturn]] DUCKDB_API void ThrowNullArrayPtrConstruction();
-[[noreturn]] DUCKDB_API void ThrowArrayPtrIteratorOutOfRange();
 
 [[noreturn]] DUCKDB_API void ThrowVectorIndexOutOfBounds(idx_t index, idx_t size);
 [[noreturn]] DUCKDB_API void ThrowDequeIndexOutOfBounds(idx_t index, idx_t size);
