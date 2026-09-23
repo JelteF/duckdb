@@ -42,7 +42,21 @@ public:
 		return "NUMBER_LITERAL";
 	}
 
+	bool CanStartWith(MatchState &state) const override {
+		auto token = state.token_iterator.Current();
+		return token && StartsNumberLiteral(token->text);
+	}
+
 private:
+	//! The cheap half of MatchNumberLiteral: only a token starting with a digit or a '.' can be a number
+	static bool StartsNumberLiteral(const string &token_text) {
+		if (token_text.empty() || !Tokenizer::CharacterIsInitialNumber(token_text[0])) {
+			return false;
+		}
+		// A lone '.' is a dot operator, not a number literal (e.g., '?.method()' should not consume '.')
+		return !(token_text.size() == 1 && token_text[0] == '.');
+	}
+
 	static bool MatchNumberLiteral(MatchState &state) {
 		auto token = state.token_iterator.Current();
 		if (!token) {

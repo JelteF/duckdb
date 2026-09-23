@@ -16,6 +16,7 @@
 #include "duckdb/parser/peg/parsed_grammar.hpp"
 #include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/statement/select_statement.hpp"
+#include "duckdb/parser/statement/vacuum_statement.hpp"
 #include "duckdb/parser/tableref/emptytableref.hpp"
 
 using namespace duckdb;
@@ -1232,4 +1233,33 @@ TEST_CASE("Invalid Grammar extensions fail grammar compilation", "[api][grammar_
 	CheckGrammarExtensionTestSyntax(con);
 	auto setting = con.Query("SELECT current_setting('active_grammar_extensions')")->GetValue(0, 0);
 	REQUIRE(ListValue::GetChildren(setting).size() == 2);
+}
+
+TEST_CASE("A matcher that can match nothing is not skipped", "[api][grammar_extension]") {
+	// VacuumOptions <- VacuumParensOptions / VacuumLegacyOptions, and VacuumLegacyOptions is a list of optionals,
+	// so it matches nothing before a table name. Skipping it would leave the statement without its vacuum flag.
+	Parser parser;
+	REQUIRE_NOTHROW(parser.ParseQuery("VACUUM tbl"));
+	REQUIRE(parser.statements.size() == 1);
+	auto &vacuum = parser.statements[0]->Cast<VacuumStatement>();
+	REQUIRE(vacuum.info->options.vacuum);
+	REQUIRE_FALSE(vacuum.info->options.analyze);
+}
+
+TEST_CASE("A custom keyword matcher is tried for the tokens it accepts", "[api][grammar_extension]") {
+	// The custom 'SELECT' matcher also accepts FROM and is the only alternative that does, so pruning it on the
+	// literal it was built from loses the match. The pre-check that would prune it is the one a choice applies
+	// to its alternatives; a list pushes its mandatory children without one.
+	auto compiled = CompiledGrammar::Create();
+	auto grammar = ParsedGrammar::Parse("Program <- 'SELECT' / 'WHERE'");
+	auto rules = CompileTestProgramRule(grammar);
+	MatcherAllocator allocator;
+	idx_t calls = 0;
+	DispatchOverrideMatcherFactory factory(allocator, grammar, rules, compiled->GetKeywordHelper(), calls);
+	auto &root = factory.CreateRootMatcher("Program");
+	allocator.ComputeStartSets(compiled->GetKeywordHelper().GetLiteralTable());
+	auto result = MatchLiteralChoiceTest(root, "FROM", MatchMode::RECOGNIZE_ONLY);
+	REQUIRE(result.success);
+	REQUIRE(result.position == 1);
+	REQUIRE(calls == 1);
 }
