@@ -1,6 +1,7 @@
 #pragma once
 
 #include "duckdb/parser/peg/matcher.hpp"
+#include "duckdb/parser/peg/matcher/choice_matcher.hpp"
 #include "duckdb/parser/peg/matcher/precedence_hierarchy.hpp"
 
 namespace duckdb {
@@ -43,7 +44,13 @@ public:
 		return "(" + result + ")";
 	}
 
-
+	//! Matched in the choice's own frame rather than in one of its own. See MatcherFactory::FuseSingleChoiceRules.
+	void SetFusedChoice(const ChoiceMatcher &choice) {
+		fused_choice = choice;
+	}
+	optional_ptr<const ChoiceMatcher> GetFusedChoice() const {
+		return fused_choice;
+	}
 
 	//! Matched as a level of the operator precedence hierarchy rather than as a plain list. See PrecedenceHierarchy.
 	void SetPrecedenceLevel(const PrecedenceHierarchy &hierarchy_p, idx_t level_p) {
@@ -63,6 +70,7 @@ public:
 	bool suppress_suggestions = false;
 
 private:
+	optional_ptr<const ChoiceMatcher> fused_choice;
 	optional_ptr<const PrecedenceHierarchy> hierarchy;
 	idx_t level = 0;
 };

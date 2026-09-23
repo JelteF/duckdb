@@ -1,4 +1,5 @@
 #include "duckdb/parser/peg/matcher.hpp"
+#include "duckdb/common/bit_utils.hpp"
 #include "duckdb/parser/peg/matcher/choice_matcher.hpp"
 #include "duckdb/parser/peg/matcher/literal_choice_matcher.hpp"
 #include "duckdb/parser/peg/matcher/list_matcher.hpp"
@@ -415,16 +416,22 @@ private:
 arena_ptr<MatchProcess> ListMatcher::StartMatch(MatchState &state) const {
 	// Auto-completion needs the suggestions that the failing children of the written rules produce, so neither the
 	// hierarchy nor the fused choice is taken when the stream has a cursor in it.
-	if (hierarchy && !state.token_iterator.HasAutocompleteCursor()) {
-		return state.Make<PrecedenceMatchProcess>(*this, state);
+	if (!state.token_iterator.HasAutocompleteCursor()) {
+		if (hierarchy) {
+			return state.Make<PrecedenceMatchProcess>(*this, state);
+		}
+		if (fused_choice) {
+			return fused_choice->StartFusedMatch(state, *this);
+		}
 	}
 	return state.Make<ListMatchProcess>(*this, state);
 }
 template <bool SINGLE_CHILD>
 class ChoiceMatchProcess : public MatchProcess {
 public:
-	ChoiceMatchProcess(const ChoiceMatcher &matcher_p, MatchState &state_p, idx_t child_index_p = 0)
-	    : matcher(matcher_p), state(state_p), child_index(child_index_p) {
+	ChoiceMatchProcess(const ChoiceMatcher &matcher_p, MatchState &state_p, idx_t child_index_p = 0,
+	                   optional_ptr<const ListMatcher> wrapper_p = nullptr)
+	    : matcher(matcher_p), state(state_p), wrapper(wrapper_p), child_index(child_index_p) {
 		if (auto current = state.token_iterator.Current()) {
 			start_offset = optional_idx(current->offset);
 		}
@@ -438,10 +445,16 @@ public:
 			if (child_result->IsSuccess()) {
 				state.token_iterator.SetPosition(child_state.value().token_iterator);
 				if (!child_result->HasParseResult()) {
-					return MatchStep::Complete(MatcherResult::Success());
+					return MatchStep::Complete(WrapResult(nullptr));
 				}
-				return MatchStep::Complete(state.AllocateParseResult<ChoiceParseResult>(*child_result->GetParseResult(),
-				                                                                        child_index, start_offset));
+				// a fused frame stands in for the wrapper's frame and the choice's, and only the wrapper's was
+				// pushed, so the choice's result is allocated under the rule its own frame would have set
+				auto wrapper_rule = state.rule;
+				state.rule = matcher.GetRule();
+				auto choice_result = state.AllocateParseResult<ChoiceParseResult>(*child_result->GetParseResult(),
+				                                                                  child_index, start_offset);
+				state.rule = wrapper_rule;
+				return MatchStep::Complete(WrapResult(choice_result.GetParseResult()));
 			}
 			if (SINGLE_CHILD) {
 				return MatchStep::Complete(MatcherResult::Failure());
@@ -463,8 +476,40 @@ public:
 	}
 
 private:
+	//! A rule whose whole body is one ordered choice is matched in this frame rather than in a list frame of its
+	//! own, so the result the list would have built is built here instead.
+	MatcherResult WrapResult(optional_ptr<ParseResult> choice_result) {
+		if (!wrapper) {
+			return MatcherResult::Success(choice_result);
+		}
+		if (!choice_result) {
+			arena_vector<reference<ParseResult>> empty(state.context.process_allocator);
+			return state.AllocateParseResult<ListParseResult>(state.context.allocator.MakeChildren(empty),
+			                                                  WrapperMatcher(), start_offset);
+		}
+		// The same condition the list frame applies: a result only collapses into this rule when it carries a rule
+		// of its own, because that rule is what transforms it. A choice built for a rule's body carries no rule,
+		// so this declines for every rule fused today; it is here because the fused frame has to stay equivalent
+		// to the two frames it replaces.
+		if (wrapper->IsCollapsible() && choice_result->GetRule()) {
+			choice_result->collapsed = true;
+			return MatcherResult::Success(choice_result);
+		}
+		arena_vector<reference<ParseResult>> children(state.context.process_allocator);
+		children.push_back(*choice_result);
+		auto list_children = state.context.allocator.MakeChildren(children);
+		return state.AllocateParseResult<ListParseResult>(list_children, WrapperMatcher(), start_offset);
+	}
+
+	optional_ptr<const Matcher> WrapperMatcher() const {
+		return wrapper->HasName() ? optional_ptr<const Matcher>(wrapper.get()) : nullptr;
+	}
+
+private:
 	const ChoiceMatcher &matcher;
 	MatchState &state;
+	//! Set when this frame stands in for the list frame of a rule whose body is only this choice
+	optional_ptr<const ListMatcher> wrapper;
 	optional<MatchState> child_state;
 	idx_t child_index = 0;
 	optional_idx start_offset;
@@ -475,10 +520,22 @@ arena_ptr<MatchProcess> ChoiceMatcher::StartMatch(MatchState &state) const {
 	return state.Make<ChoiceMatchProcess<false>>(*this, state);
 }
 
+idx_t LiteralChoiceMatcher::DispatchIndex(MatchState &state) const {
+	auto literal = state.token_iterator.CurrentLiteralInfo(table);
+	auto entry = literal_children.find(literal.LiteralId());
+	return entry == literal_children.end() ? matchers.size() : entry->second;
+}
+
 arena_ptr<MatchProcess> LiteralChoiceMatcher::StartMatch(MatchState &state) const {
-	auto literal = state.token_iterator.CurrentLiteralInfo(table);	auto entry = literal_children.find(literal.LiteralId());
-	auto child_index = entry == literal_children.end() ? matchers.size() : entry->second;
-	return state.Make<ChoiceMatchProcess<true>>(*this, state, child_index);
+	return state.Make<ChoiceMatchProcess<true>>(*this, state, DispatchIndex(state));
+}
+
+arena_ptr<MatchProcess> LiteralChoiceMatcher::StartFusedMatch(MatchState &state, const ListMatcher &wrapper) const {
+	return state.Make<ChoiceMatchProcess<true>>(*this, state, DispatchIndex(state), wrapper);
+}
+
+arena_ptr<MatchProcess> ChoiceMatcher::StartFusedMatch(MatchState &state, const ListMatcher &wrapper) const {
+	return state.Make<ChoiceMatchProcess<false>>(*this, state, 0, wrapper);
 }
 
 class OptionalMatchProcess : public MatchProcess {

@@ -37,6 +37,8 @@ public:
 
 public:
 	Matcher &CreateRootMatcher(const string &root_rule);
+	//! Mark the rules whose whole body is one ordered choice, which are matched without a list frame
+	void FuseSingleChoiceRules();
 	//! Look up a matcher for a rule that was built by CreateRootMatcher. Throws if the rule has not been built.
 	Matcher &GetMatcher(const string &rule_name);
 	//! Index what the start sets say, which is only possible once MatcherAllocator::ComputeStartSets has run

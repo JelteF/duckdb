@@ -337,6 +337,24 @@ void MatcherFactory::BuildPrecedenceHierarchy(const string &root_rule) {
 	}
 }
 
+void MatcherFactory::FuseSingleChoiceRules() {
+	for (auto &entry : matchers) {
+		auto &matcher = entry.second.get();
+		if (matcher.Type() != MatcherType::LIST) {
+			continue;
+		}
+		auto &list = matcher.Cast<ListMatcher>();
+		// a rule that is only an ordered choice does not need a frame of its own to wrap the choice's result
+		if (list.suppress_suggestions || list.GetHierarchy() || list.matchers.size() != 1) {
+			continue;
+		}
+		auto &child = list.matchers[0].get();
+		if (child.Type() != MatcherType::CHOICE) {
+			continue;
+		}
+		list.SetFusedChoice(child.Cast<ChoiceMatcher>());
+	}
+}
 
 Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 	// keyword overrides
@@ -426,6 +444,7 @@ Matcher &MatcherFactory::CreateRootMatcher(const string &root_rule) {
 		CreateMatcher(construction_state.TakeNext());
 	}
 	BuildPrecedenceHierarchy("Expression");
+	FuseSingleChoiceRules();
 	return GetMatcher(root_rule);
 }
 
