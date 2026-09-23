@@ -264,6 +264,29 @@ enum class MatcherType {
 	CUSTOM
 };
 
+//! Which tokens a matcher can start with, computed once per grammar by MatcherAllocator::ComputeStartSets. Used by
+//! Matcher::MayMatchHere to skip matchers that cannot match at the current token without pushing a frame for them.
+struct MatcherStartSet {
+	//! Anything may start this matcher (custom or untyped atomic matchers, or a cycle in the grammar): never prune
+	bool any = false;
+	//! The matcher can match zero tokens, so it may match at any token: never prune. Kept apart from `any` because
+	//! nullability does not propagate to a parent the way the start tokens do - a list whose first element is
+	//! optional is not itself nullable, and still prunes on the tokens that can start it.
+	bool nullable = false;
+	optional_ptr<const GrammarLiteralTable> literal_table;
+	//! Sorted literal ids of the keywords that can start the matcher
+	vector<uint16_t> literal_ids;
+	//! `literal_ids` folded into 64 buckets. A literal whose bucket is clear is certainly not in the set, which
+	//! answers the common case - the token is not one this matcher starts with - without searching the list.
+	uint64_t literal_signature = 0;
+	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
+	vector<reference<const Matcher>> predicate_leaders;
+
+	static uint64_t SignatureBit(uint16_t literal_id) {
+		return uint64_t(1) << (literal_id & 63);
+	}
+};
+
 class Matcher {
 public:
 	explicit Matcher(MatcherType type = MatcherType::CUSTOM) : type(type) {
@@ -276,6 +299,15 @@ public:
 	virtual arena_ptr<MatchProcess> StartMatch(MatchState &state) const = 0;
 	virtual bool IsAtomic() const {
 		return false;
+	}
+	//! Cheap, conservative pre-check used to skip matchers that cannot possibly match at the current token, without
+	//! pushing a frame for them. Returns false only when a match is certainly impossible; anything unsure (custom
+	//! matchers, nullable children, deep nesting) answers true. Never prunes at the autocomplete cursor, where the
+	//! failing children are what produce the suggestions.
+	bool MayMatchHere(MatchState &state) const;
+	//! Token predicate for atomic matchers, consulted through the start sets; composite matchers never override it
+	virtual bool CanStartWith(MatchState &state) const {
+		return true;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;
@@ -305,6 +337,9 @@ public:
 	void SetPackratMemoized() {
 		packrat_memoized = true;
 	}
+	idx_t AllocationIndex() const {
+		return allocation_index;
+	}
 	bool IsPackratMemoized() const {
 		return packrat_memoized;
 	}
@@ -333,6 +368,11 @@ protected:
 	optional_idx packrat_id;
 	bool packrat_memoized = false;
 	optional_ptr<const CompiledGrammarRule> rule;
+	unique_ptr<MatcherStartSet> start_set;
+	//! Position in MatcherAllocator::matchers, so a pass over the graph can index its own state by matcher
+	//! instead of hashing the pointer. Read only while the grammar is built, so it sits away from the fields
+	//! the match reads.
+	uint32_t allocation_index = NumericLimits<uint32_t>::Maximum();
 };
 
 class AtomicMatcher : public Matcher {
@@ -363,9 +403,15 @@ public:
 class MatcherAllocator {
 public:
 	Matcher &Allocate(unique_ptr<Matcher> matcher);
+	//! Compute MatcherStartSet for every allocated matcher. Called once the matcher graph of a grammar is complete.
+	void ComputeStartSets(const GrammarLiteralTable &literal_table);
 
 private:
 	vector<unique_ptr<Matcher>> matchers;
+	//! A matcher allocated after the sets were computed would be missing from the sets of every matcher that
+	//! reaches it, and MayMatchHere would prune the branch it is on. Growing a grammar means building a new one,
+	//! so this only guards against a future caller that tries to extend one in place without recomputing.
+	bool start_sets_computed = false;
 };
 
 class ParseResultAllocator {
