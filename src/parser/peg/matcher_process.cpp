@@ -103,7 +103,8 @@ public:
 		}
 		auto named_matcher = matcher.HasName() ? &matcher : nullptr;
 		return MatchStep::Complete(state.AllocateParseResult<ListParseResult>(
-		    state.context.allocator.MakeChildren(results), named_matcher, start_offset));	}
+		    state.context.allocator.MakeChildren(results), named_matcher, start_offset));
+	}
 
 private:
 	//! The child that can stand in for this rule's own result, or nullptr when the rule has to build one
@@ -188,6 +189,11 @@ public:
 			child_index++;
 			child_state.reset();
 		}
+		if (!SINGLE_CHILD) {
+			while (child_index < matcher.matchers.size() && !matcher.matchers[child_index].get().MayMatchHere(state)) {
+				child_index++;
+			}
+		}
 		if (child_index >= matcher.matchers.size()) {
 			return MatchStep::Complete(MatcherResult::Failure());
 		}
@@ -228,6 +234,9 @@ public:
 	MatchStep Resume(optional<MatcherResult> child_result) override {
 		D_ASSERT(awaiting_child == child_result.has_value());
 		if (!child_result) {
+			if (!matcher.GetChildMatcher().MayMatchHere(child_state)) {
+				return MatchStep::Complete(state.AllocateParseResult<OptionalParseResult>());
+			}
 			awaiting_child = true;
 			return MatchStep::Child({matcher.GetChildMatcher(), child_state});
 		}
@@ -284,6 +293,12 @@ public:
 				matcher.GetChildMatcher().AddSuggestion(state);
 				return MatchStep::Complete(CreateResult());
 			}
+		}
+		if (!matcher.GetChildMatcher().MayMatchHere(repeat_state)) {
+			if (!matched_once) {
+				return MatchStep::Complete(MatcherResult::Failure());
+			}
+			return MatchStep::Complete(CreateResult());
 		}
 		awaiting_child = true;
 		return MatchStep::Child({matcher.GetChildMatcher(), repeat_state});

@@ -39,8 +39,21 @@ public:
 		return "OPERATOR";
 	}
 
+	bool CanStartWith(MatchState &state) const override {
+		return OperatorMatches(state);
+	}
+
 private:
 	bool MatchOperator(MatchState &state) const {
+		if (!OperatorMatches(state)) {
+			return false;
+		}
+		state.token_iterator.Advance();
+		state.UpdateMaxTokenIndex();
+		return true;
+	}
+
+	bool OperatorMatches(MatchState &state) const {
 		auto token = state.token_iterator.Current();
 		if (!token) {
 			return false;
@@ -54,8 +67,6 @@ private:
 				return false;
 			}
 		}
-		state.token_iterator.Advance();
-		state.UpdateMaxTokenIndex();
 		return true;
 	}
 

@@ -265,6 +265,22 @@ enum class MatcherType {
 	CUSTOM
 };
 
+//! Which tokens a matcher can start with, computed once per grammar by MatcherAllocator::ComputeStartSets. Used by
+//! Matcher::MayMatchHere to skip matchers that cannot match at the current token without pushing a frame for them.
+struct MatcherStartSet {
+	//! Anything may start this matcher (custom or untyped atomic matchers, or a cycle in the grammar): never prune
+	bool any = false;
+	//! The matcher can match zero tokens, so it may match at any token: never prune. Kept apart from `any` because
+	//! nullability does not propagate to a parent the way the start tokens do - a list whose first element is
+	//! optional is not itself nullable, and still prunes on the tokens that can start it.
+	bool nullable = false;
+	optional_ptr<const GrammarLiteralTable> literal_table;
+	//! Sorted literal ids of the keywords that can start the matcher
+	vector<uint16_t> literal_ids;
+	//! Atomic matchers with a token predicate (identifiers, operators) that can start the matcher
+	vector<reference<const Matcher>> predicate_leaders;
+};
+
 class Matcher {
 public:
 	explicit Matcher(MatcherType type = MatcherType::CUSTOM) : type(type) {
@@ -277,6 +293,14 @@ public:
 	virtual arena_ptr<MatchProcess> StartMatch(MatchState &state) const = 0;
 	virtual bool IsAtomic() const {
 		return false;
+	}
+	//! Conservative pre-check that skips a matcher without pushing a frame for it. Returns false only when a match
+	//! is certainly impossible, and never at the autocomplete cursor, where the failing children produce the
+	//! suggestions.
+	bool MayMatchHere(MatchState &state) const;
+	//! Token predicate for atomic matchers, consulted through the start sets; composite matchers never override it
+	virtual bool CanStartWith(MatchState &state) const {
+		return true;
 	}
 	virtual SuggestionType AddSuggestion(MatchState &state) const;
 	virtual SuggestionType AddSuggestionInternal(MatchState &state) const = 0;
@@ -347,6 +371,7 @@ protected:
 	bool packrat_memoized = false;
 	bool collapsible = false;
 	optional_ptr<const CompiledGrammarRule> rule;
+	unique_ptr<MatcherStartSet> start_set;
 };
 
 class AtomicMatcher : public Matcher {
@@ -377,9 +402,14 @@ public:
 class MatcherAllocator {
 public:
 	Matcher &Allocate(unique_ptr<Matcher> matcher);
+	//! Compute MatcherStartSet for every allocated matcher. Called once the matcher graph of a grammar is complete.
+	void ComputeStartSets(const GrammarLiteralTable &literal_table);
 
 private:
 	vector<unique_ptr<Matcher>> matchers;
+	//! A matcher allocated after the sets were computed would be missing from them, and MayMatchHere would prune
+	//! the branch it is on. Growing a grammar builds a new one, so this only guards an in-place extension.
+	bool start_sets_computed = false;
 };
 
 class ParseResultAllocator {
