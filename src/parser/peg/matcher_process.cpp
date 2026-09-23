@@ -103,8 +103,7 @@ public:
 		}
 		auto named_matcher = matcher.HasName() ? &matcher : nullptr;
 		return MatchStep::Complete(state.AllocateParseResult<ListParseResult>(
-		    state.context.allocator.MakeChildren(results), named_matcher, start_offset));
-	}
+		    state.context.allocator.MakeChildren(results), named_matcher, start_offset));	}
 
 private:
 	//! The child that can stand in for this rule's own result, or nullptr when the rule has to build one
