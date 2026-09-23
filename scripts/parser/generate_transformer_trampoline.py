@@ -282,6 +282,8 @@ class UseGramPreviewEmitter:
         self.matcher_overrides = matcher_overrides
         self.rule_config = rule_config
         self.syntax_only_rules = self.collect_syntax_only_rules()
+        # rules whose finalizer only hands back its single child, recorded while emitting them
+        self.forwarding_rules = []
         self.rule_capabilities = self.collect_rule_capabilities()
 
     def collect_syntax_only_rules(self):
@@ -838,6 +840,9 @@ class UseGramPreviewEmitter:
         cpp_type = self.cpp_type(rule_name)
         by_value = self.by_value(rule_name)
         slot_expr = self.adjusted_slot_expr(plan, child_arg.slot_idx)
+        # sequence_forward_child only picks a child when it is the rule's only one that carries a value, and this
+        # body hands that child's result straight back, so the matcher can hand out the child instead
+        self.forwarding_rules.append(rule_name)
         return [
             f"\tauto result = process.TakeResult<{cpp_type}>({slot_expr});",
             f"\treturn {typed_result_expr(cpp_type, 'result', by_value)};",
@@ -1009,6 +1014,9 @@ class UseGramPreviewEmitter:
             lines.append("\t}")
         else:
             lines.append(f"\tauto result = process.TakeResult<{cpp_type}>(0);")
+            # nothing above this branch emitted anything, so the finalizer only takes the chosen alternative's
+            # result and hands it back; transforming that alternative on its own gives the same value
+            self.forwarding_rules.append(rule_name)
         lines.append(f"\treturn {typed_result_expr(cpp_type, 'result', by_value)};")
         lines.append("}")
         return lines
@@ -1609,6 +1617,10 @@ def main():
         write_matcher_rule_overrides(matcher_override_config)
         packrat_rules = load_packrat_memoized_rules(grammar_types_file, all_rules.keys())
         collapsible_rules = load_collapsible_rules(grammar_types_file, all_rules.keys())
+        # the rules that only forward their child are found from the finalizers rather than listed by hand, so the
+        # list cannot drift from the grammar
+        listed = set(collapsible_rules)
+        collapsible_rules += [name for name in dict.fromkeys(emitter.forwarding_rules) if name not in listed]
         write_packrat_memoized_rules(packrat_rules)
         write_collapsible_rules(collapsible_rules)
     elif args.report:

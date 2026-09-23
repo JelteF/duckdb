@@ -447,12 +447,20 @@ public:
 				if (!child_result->HasParseResult()) {
 					return MatchStep::Complete(WrapResult(nullptr));
 				}
+				auto &alternative = *child_result->GetParseResult();
+				// a collapsible rule whose body is only this choice hands out the alternative unchanged, so neither
+				// the choice node nor the list node around it is built. The alternative has to carry a rule of its
+				// own, since that is what the transformer runs in place of the collapsed rule.
+				if (wrapper && wrapper->IsCollapsible() && alternative.GetRule()) {
+					alternative.collapsed = true;
+					return MatchStep::Complete(MatcherResult::Success(&alternative));
+				}
 				// a fused frame stands in for the wrapper's frame and the choice's, and only the wrapper's was
 				// pushed, so the choice's result is allocated under the rule its own frame would have set
 				auto wrapper_rule = state.rule;
 				state.rule = matcher.GetRule();
-				auto choice_result = state.AllocateParseResult<ChoiceParseResult>(*child_result->GetParseResult(),
-				                                                                  child_index, start_offset);
+				auto choice_result =
+				    state.AllocateParseResult<ChoiceParseResult>(alternative, child_index, start_offset);
 				state.rule = wrapper_rule;
 				return MatchStep::Complete(WrapResult(choice_result.GetParseResult()));
 			}
@@ -486,14 +494,6 @@ private:
 			arena_vector<reference<ParseResult>> empty(state.context.process_allocator);
 			return state.AllocateParseResult<ListParseResult>(state.context.allocator.MakeChildren(empty),
 			                                                  WrapperMatcher(), start_offset);
-		}
-		// The same condition the list frame applies: a result only collapses into this rule when it carries a rule
-		// of its own, because that rule is what transforms it. A choice built for a rule's body carries no rule,
-		// so this declines for every rule fused today; it is here because the fused frame has to stay equivalent
-		// to the two frames it replaces.
-		if (wrapper->IsCollapsible() && choice_result->GetRule()) {
-			choice_result->collapsed = true;
-			return MatcherResult::Success(choice_result);
 		}
 		arena_vector<reference<ParseResult>> children(state.context.process_allocator);
 		children.push_back(*choice_result);
