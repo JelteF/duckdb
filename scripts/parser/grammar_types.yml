@@ -1805,9 +1805,9 @@ matcher_rule_overrides:
     allow_type_overlap: true
     matcher: all_operators
 
-# collapsible_rules: see MatcherFactory::AddCollapsibleRule. Every rule below has a hand-written transformer that
-# returns its operand unchanged when the rest of the rule matched nothing. Take a rule out of this list if that
-# stops being true.
+# collapsible_rules: see MatcherFactory::AddCollapsibleRule. The generator adds every rule whose finalizer it
+# emits as a plain forward; the ones below have a hand-written transformer instead, which returns its operand
+# unchanged when the rest of the rule matched nothing. Take a rule out of this list if that stops being true.
 collapsible_rules:
   - LambdaArrowExpression
   - LogicalOrExpression
