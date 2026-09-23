@@ -313,6 +313,10 @@ public:
 	//! is certainly impossible, and never at the autocomplete cursor, where the failing children produce the
 	//! suggestions.
 	bool MayMatchHere(MatchState &state) const;
+	//! The tokens this matcher can start with, or null before MatcherAllocator::ComputeStartSets ran
+	optional_ptr<const MatcherStartSet> GetStartSet() const {
+		return start_set.get();
+	}
 	//! Token predicate for atomic matchers, consulted through the start sets; composite matchers never override it
 	virtual bool CanStartWith(MatchState &state) const {
 		return true;

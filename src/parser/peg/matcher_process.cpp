@@ -204,13 +204,26 @@ private:
 
 	//! The outermost prefix level that is allowed here and whose prefix can start at the current token
 	idx_t FindPrefixLevel() {
-		for (idx_t level = min_level; level < hierarchy.levels.size(); level++) {
-			auto &entry = hierarchy.levels[level];
-			if (entry.IsPrefix() && entry.affix->MayMatchHere(work_state)) {
+		for (auto level : hierarchy.prefix_levels) {
+			if (level >= min_level && hierarchy.levels[level].affix->MayMatchHere(work_state)) {
 				return level;
 			}
 		}
 		return hierarchy.levels.size();
+	}
+
+	//! The suffix levels whose tail could start at the current token
+	uint32_t CandidateLevels() {
+		auto token = work_state.token_iterator.Current();
+		if (!token) {
+			return 0;
+		}
+		auto candidates = hierarchy.predicate_levels;
+		if (hierarchy.literal_table) {
+			auto literal_id = work_state.token_iterator.CurrentLiteralInfo(*hierarchy.literal_table).LiteralId();
+			candidates |= hierarchy.LiteralLevels(literal_id);
+		}
+		return candidates;
 	}
 
 	MatchStep Start() {
@@ -267,17 +280,22 @@ private:
 
 	//! Walk outwards from the level the value currently sits at, looking for a level whose tail starts here
 	MatchStep Climb() {
-		while (climb_level > min_level) {
-			climb_level--;
-			auto &entry = hierarchy.levels[climb_level];
-			if (!entry.IsSuffix()) {
+		if (climb_level <= min_level) {
+			return Complete();
+		}
+		auto candidates = CandidateLevels() & PrecedenceHierarchy::LevelRange(min_level, climb_level);
+		while (candidates) {
+			auto level = idx_t(31 - CountZeros<uint32_t>::Leading(candidates));
+			candidates &= ~(uint32_t(1) << level);
+			// a level the literal table could not answer for still needs its own probe
+			if (((hierarchy.predicate_levels >> level) & 1) &&
+			    !hierarchy.levels[level].affix->MayMatchHere(work_state)) {
 				continue;
 			}
-			if (!entry.affix->MayMatchHere(work_state)) {
-				continue;
-			}
+			climb_level = level;
 			return RequestTail();
 		}
+		climb_level = min_level;
 		return Complete();
 	}
 
@@ -402,7 +420,6 @@ arena_ptr<MatchProcess> ListMatcher::StartMatch(MatchState &state) const {
 	}
 	return state.Make<ListMatchProcess>(*this, state);
 }
-
 template <bool SINGLE_CHILD>
 class ChoiceMatchProcess : public MatchProcess {
 public:
@@ -459,8 +476,7 @@ arena_ptr<MatchProcess> ChoiceMatcher::StartMatch(MatchState &state) const {
 }
 
 arena_ptr<MatchProcess> LiteralChoiceMatcher::StartMatch(MatchState &state) const {
-	auto literal = state.token_iterator.CurrentLiteralInfo(table);
-	auto entry = literal_children.find(literal.LiteralId());
+	auto literal = state.token_iterator.CurrentLiteralInfo(table);	auto entry = literal_children.find(literal.LiteralId());
 	auto child_index = entry == literal_children.end() ? matchers.size() : entry->second;
 	return state.Make<ChoiceMatchProcess<true>>(*this, state, child_index);
 }

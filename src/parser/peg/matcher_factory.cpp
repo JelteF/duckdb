@@ -266,6 +266,45 @@ MatcherFactory::MatcherFactory(MatcherAllocator &allocator, const ParsedGrammar 
       terminal_rule_overrides(std::move(terminal_rule_overrides_p)) {
 }
 
+//! Index the levels by the tokens their affix can start with, so that walking the hierarchy outwards costs one lookup
+//! instead of a start set probe per level.
+static void BuildHierarchyLevelMasks(PrecedenceHierarchy &hierarchy) {
+	for (idx_t level = 0; level < hierarchy.levels.size(); level++) {
+		auto &entry = hierarchy.levels[level];
+		if (!entry.affix) {
+			continue;
+		}
+		if (entry.IsPrefix()) {
+			hierarchy.prefix_levels.push_back(level);
+			continue;
+		}
+		auto level_bit = uint32_t(1) << level;
+		auto start_set = entry.affix->GetStartSet();
+		// a nullable affix matches at any token, so its level can never be decided by the literal index alone
+		if (!start_set || start_set->any || start_set->nullable || !start_set->predicate_leaders.empty()) {
+			hierarchy.predicate_levels |= level_bit;
+		}
+		if (!start_set) {
+			continue;
+		}
+		if (start_set->literal_table) {
+			hierarchy.literal_table = start_set->literal_table;
+		}
+		for (auto literal_id : start_set->literal_ids) {
+			if (literal_id >= hierarchy.literal_levels.size()) {
+				hierarchy.literal_levels.resize(literal_id + 1, 0);
+			}
+			hierarchy.literal_levels[literal_id] |= level_bit;
+		}
+	}
+}
+
+void MatcherFactory::IndexStartSets() {
+	for (auto &hierarchy : hierarchies) {
+		BuildHierarchyLevelMasks(hierarchy.get());
+	}
+}
+
 void MatcherFactory::BuildPrecedenceHierarchy(const string &root_rule) {
 	auto entry = matchers.find(root_rule);
 	if (entry == matchers.end() || entry->second.get().Type() != MatcherType::LIST) {
@@ -286,12 +325,13 @@ void MatcherFactory::BuildPrecedenceHierarchy(const string &root_rule) {
 		current = operand.Type() == MatcherType::LIST ? optional_ptr<ListMatcher>(&operand.Cast<ListMatcher>())
 		                                              : optional_ptr<ListMatcher>();
 	}
-	if (hierarchy->levels.size() < 2) {
+	if (hierarchy->levels.size() < 2 || hierarchy->levels.size() > PrecedenceHierarchy::MAX_LEVELS) {
 		return;
 	}
 	hierarchy->leaf = hierarchy->levels.back().operand;
 
 	auto &stored = allocator.AddHierarchy(std::move(hierarchy));
+	hierarchies.push_back(stored);
 	for (idx_t level = 0; level < chain.size(); level++) {
 		chain[level].get().SetPrecedenceLevel(stored, level);
 	}

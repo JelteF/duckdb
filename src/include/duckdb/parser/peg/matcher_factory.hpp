@@ -4,6 +4,7 @@
 #include "duckdb/common/optional.hpp"
 #include "duckdb/common/queue.hpp"
 #include "duckdb/parser/peg/matcher/list.hpp"
+#include "duckdb/parser/peg/matcher/precedence_hierarchy.hpp"
 
 namespace duckdb {
 struct CompiledGrammar;
@@ -38,6 +39,8 @@ public:
 	Matcher &CreateRootMatcher(const string &root_rule);
 	//! Look up a matcher for a rule that was built by CreateRootMatcher. Throws if the rule has not been built.
 	Matcher &GetMatcher(const string &rule_name);
+	//! Index what the start sets say, which is only possible once MatcherAllocator::ComputeStartSets has run
+	void IndexStartSets();
 
 protected:
 	// Base primitives
@@ -86,6 +89,7 @@ private:
 	string_set_t no_suggestion_rules;
 	string_set_t packrat_memoized_rules;
 	string_set_t collapsible_rules;
+	vector<reference<PrecedenceHierarchy>> hierarchies;
 };
 
 } // namespace duckdb
