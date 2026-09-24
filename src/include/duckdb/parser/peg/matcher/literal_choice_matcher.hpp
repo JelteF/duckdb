@@ -12,6 +12,10 @@ public:
 	}
 
 	arena_ptr<MatchProcess> StartMatch(MatchState &state) const override;
+	arena_ptr<MatchProcess> StartFusedMatch(MatchState &state, const ListMatcher &wrapper) const override;
+
+	//! The single alternative the current token can select, or the alternative count when none can
+	idx_t DispatchIndex(MatchState &state) const;
 
 private:
 	const GrammarLiteralTable &table;

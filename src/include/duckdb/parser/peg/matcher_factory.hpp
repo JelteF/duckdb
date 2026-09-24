@@ -4,6 +4,7 @@
 #include "duckdb/common/optional.hpp"
 #include "duckdb/common/queue.hpp"
 #include "duckdb/parser/peg/matcher/list.hpp"
+#include "duckdb/parser/peg/matcher/precedence_hierarchy.hpp"
 
 namespace duckdb {
 struct CompiledGrammar;
@@ -36,8 +37,12 @@ public:
 
 public:
 	Matcher &CreateRootMatcher(const string &root_rule);
+	//! Mark the rules whose whole body is one ordered choice, which are matched without a list frame
+	void FuseSingleChoiceRules();
 	//! Look up a matcher for a rule that was built by CreateRootMatcher. Throws if the rule has not been built.
 	Matcher &GetMatcher(const string &rule_name);
+	//! Index what the start sets say, which is only possible once MatcherAllocator::ComputeStartSets has run
+	void IndexStartSets();
 
 protected:
 	// Base primitives
@@ -57,6 +62,8 @@ protected:
 	void AddKeywordOverride(const char *name, KeywordInfo keyword_info);
 	void AddRuleOverride(const char *name, unique_ptr<Matcher> &&matcher_p);
 	void AddPackratMemoizedRule(const char *name);
+	//! Find the chain of collapsible rules that starts at `root_rule` and mark its matchers as hierarchy levels
+	void BuildPrecedenceHierarchy(const string &root_rule);
 	//! Mark a rule whose transformer hands back one child's result unchanged, such as a level of the operator
 	//! precedence hierarchy that matched no tail. When that child is the only one with a parse result, the matcher
 	//! hands it out instead of wrapping it and the transformer runs the child's own transform.
@@ -84,6 +91,7 @@ private:
 	string_set_t no_suggestion_rules;
 	string_set_t packrat_memoized_rules;
 	string_set_t collapsible_rules;
+	vector<reference<PrecedenceHierarchy>> hierarchies;
 };
 
 } // namespace duckdb

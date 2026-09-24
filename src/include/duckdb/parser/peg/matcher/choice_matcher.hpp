@@ -4,6 +4,7 @@
 #include "duckdb/common/string.hpp"
 
 namespace duckdb {
+class ListMatcher;
 
 class ChoiceMatcher : public Matcher {
 public:
@@ -16,6 +17,9 @@ public:
 	}
 
 	DUCKDB_API arena_ptr<MatchProcess> StartMatch(MatchState &state) const override;
+	//! Start the choice in the frame of the rule whose whole body it is, so that it builds the list result that
+	//! rule's own frame would have built. See ListMatcher::SetFusedChoice.
+	DUCKDB_API virtual arena_ptr<MatchProcess> StartFusedMatch(MatchState &state, const ListMatcher &wrapper) const;
 
 	SuggestionType AddSuggestionInternal(MatchState &state) const override {
 		for (auto &child_matcher : matchers) {
