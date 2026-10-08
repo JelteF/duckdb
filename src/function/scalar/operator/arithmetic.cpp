@@ -849,6 +849,7 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &left_type, const
 	switch (left_type.id()) {
 	case LogicalTypeId::BIGNUM: {
 		ScalarFunction function("-", {left_type, right_type}, left_type, BignumSubtract);
+		function.SetFallible();
 		function.SetArgProperties({ArgProperties().StrictlyIncreasing(), ArgProperties().StrictlyDecreasing()});
 		return function;
 	}
