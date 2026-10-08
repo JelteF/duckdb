@@ -3,20 +3,17 @@
 # group: [types]
 
 # Issue #25084: Signed Integer Overflow via Negation of INT64_MIN Interval Microseconds
-# SubtractTimeOperator::Operation negates right.micros without checking for INT64_MIN,
-# causing signed integer overflow (undefined behavior).
 
-# TIME - INTERVAL with INT64_MIN microseconds should throw an error, not overflow
-statement error
+# TIME - INTERVAL with INT64_MIN microseconds wraps around midnight, like TIME + INTERVAL does
+query I
 SELECT TIME '12:00:00' - INTERVAL '-4611686018427387904 microseconds -4611686018427387904 microseconds';
 ----
-<REGEX>:.*out of range.*
+16:00:54.775808
 
-# TIMETZ - INTERVAL with INT64_MIN microseconds should throw an error, not overflow
-statement error
+query I
 SELECT TIMETZ '12:00:00+00' - INTERVAL '-4611686018427387904 microseconds -4611686018427387904 microseconds';
 ----
-<REGEX>:.*out of range.*
+16:00:54.775808+00
 
 # Interval::Invert with INT64_MIN micros should also throw
 statement error

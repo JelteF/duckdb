@@ -44,8 +44,18 @@ unique_ptr<FunctionData> ICUDateFunc::BindData::Copy() const {
 	return make_uniq<BindData>(*this);
 }
 
+bool ICUDateFunc::BindData::IsGregorian() const {
+	return TZCalendar::IsGregorianSetting(cal_setting);
+}
+
 unique_ptr<FunctionData> ICUDateFunc::Bind(BindScalarFunctionInput &input) {
 	return make_uniq<BindData>(input.GetClientContext());
+}
+
+void ICUDateFunc::SetCannotErrorIfGregorian(BoundScalarFunction &bound_function, const BindData &bind_data) {
+	if (bind_data.IsGregorian()) {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
 }
 
 const ICUDateFunc::CalendarCacheState::CacheEntry &ICUDateFunc::CalendarCacheState::GetEntry(const string_t &tz_id) {

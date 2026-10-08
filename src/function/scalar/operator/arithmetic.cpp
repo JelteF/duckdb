@@ -593,13 +593,11 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 			// TIME +/- INTERVAL wraps modulo 24h.
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIME,
 			                        ScalarFunction::BinaryFunction<interval_t, dtime_t, dtime_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		} else if (right_type.id() == LogicalTypeId::TIME_TZ) {
 			ScalarFunction function(
 			    "+", {left_type, right_type}, LogicalType::TIME_TZ,
 			    ScalarFunction::BinaryFunction<interval_t, dtime_tz_t, dtime_tz_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		} else if (right_type.id() == LogicalTypeId::TIMESTAMP) {
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIMESTAMP,
@@ -613,7 +611,6 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 		if (right_type.id() == LogicalTypeId::INTERVAL) {
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIME,
 			                        ScalarFunction::BinaryFunction<dtime_t, interval_t, dtime_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		} else if (right_type.id() == LogicalTypeId::DATE) {
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIMESTAMP,
@@ -632,7 +629,6 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 			ScalarFunction function(
 			    "+", {left_type, right_type}, LogicalType::TIME_TZ,
 			    ScalarFunction::BinaryFunction<dtime_tz_t, interval_t, dtime_tz_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		}
 		break;
@@ -913,7 +909,6 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &left_type, const
 		if (right_type.id() == LogicalTypeId::INTERVAL) {
 			ScalarFunction function("-", {left_type, right_type}, LogicalType::TIME,
 			                        ScalarFunction::BinaryFunction<dtime_t, interval_t, dtime_t, SubtractTimeOperator>);
-			function.SetFallible();
 			// TIME - INTERVAL wraps modulo 24h (e.g. 04:00 - INTERVAL '5 hours' = 23:00), so monotonicity
 			// in either argument does not hold.
 			return function;
@@ -924,7 +919,6 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &left_type, const
 			ScalarFunction function(
 			    "-", {left_type, right_type}, LogicalType::TIME_TZ,
 			    ScalarFunction::BinaryFunction<dtime_tz_t, interval_t, dtime_tz_t, SubtractTimeOperator>);
-			function.SetFallible();
 			// TIME_TZ - INTERVAL wraps modulo 24h, same reasoning as TIME above.
 			return function;
 		}

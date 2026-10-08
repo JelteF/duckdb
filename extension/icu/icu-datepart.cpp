@@ -447,7 +447,9 @@ struct ICUDatePart : public ICUDateFunc {
 	static duckdb::unique_ptr<FunctionData> BindAdapter(ClientContext &context, BoundScalarFunction &bound_function,
 	                                                    vector<duckdb::unique_ptr<Expression>> &arguments,
 	                                                    typename BIND_TYPE::adapter_t adapter) {
-		return make_uniq<BIND_TYPE>(context, adapter);
+		auto result = make_uniq<BIND_TYPE>(context, adapter);
+		SetCannotErrorIfGregorian(bound_function, *result);
+		return std::move(result);
 	}
 
 	static duckdb::unique_ptr<FunctionData> BindUnaryDatePart(BindScalarFunctionInput &input) {
@@ -496,8 +498,8 @@ struct ICUDatePart : public ICUDateFunc {
 			return BindUnaryDatePart(input);
 		} while (false);
 
-		using data_t = BindAdapterData<double>;
-		return BindAdapter<data_t>(context, bound_function, arguments, nullptr);
+		// the part is only parsed during execution, where an unrecognized part throws
+		return make_uniq<BindAdapterData<double>>(context, nullptr);
 	}
 
 	static duckdb::unique_ptr<FunctionData> BindStruct(BindScalarFunctionInput &input) {
@@ -541,7 +543,9 @@ struct ICUDatePart : public ICUDateFunc {
 		}
 
 		bound_function.SetReturnType(LogicalType::STRUCT(std::move(struct_children)));
-		return make_uniq<BindStructData>(context, std::move(part_codes));
+		auto result = make_uniq<BindStructData>(context, std::move(part_codes));
+		SetCannotErrorIfGregorian(bound_function, *result);
+		return std::move(result);
 	}
 
 	static void SerializeStructFunction(Serializer &serializer, const optional_ptr<FunctionData> bind_data,
@@ -558,7 +562,10 @@ struct ICUDatePart : public ICUDateFunc {
 		auto tz_setting = deserializer.ReadProperty<string>(100, "tz_setting");
 		auto cal_setting = deserializer.ReadProperty<string>(101, "cal_setting");
 		auto part_codes = deserializer.ReadProperty<vector<DatePartSpecifier>>(102, "part_codes");
-		return make_uniq<BindStructData>(tz_setting, cal_setting, std::move(part_codes));
+		auto result = make_uniq<BindStructData>(tz_setting, cal_setting, std::move(part_codes));
+		// the bind is not rerun on deserialization, so its error mode decision has to be restored here
+		SetCannotErrorIfGregorian(bound_function, *result);
+		return std::move(result);
 	}
 
 	template <typename INPUT_TYPE, typename RESULT_TYPE>
@@ -575,6 +582,7 @@ struct ICUDatePart : public ICUDateFunc {
 	                                      ArgProperties unary_arg0_props = {}) {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetUnaryPartCodeFunction<timestamp_tz_t, RESULT_TYPE>(LogicalType::TIMESTAMP_TZ, result_type));
+		// non-Gregorian calendars can fail for extreme timestamps - cleared in the bind for the Gregorian calendar
 		set.SetFallible();
 		set.SetUnaryArgProperties(unary_arg0_props);
 		loader.RegisterFunction(set);
@@ -603,6 +611,8 @@ struct ICUDatePart : public ICUDateFunc {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetBinaryPartCodeFunction<timestamp_tz_t, double>(LogicalType::TIMESTAMP_TZ));
 		set.AddFunction(GetStructFunction<timestamp_tz_t>(LogicalType::TIMESTAMP_TZ));
+		// throws for unrecognized non-constant parts, and non-Gregorian calendars can fail for extreme timestamps -
+		// cleared in the bind for a constant part with the Gregorian calendar
 		set.SetFallible();
 		loader.RegisterFunction(set);
 	}
@@ -625,6 +635,7 @@ struct ICUDatePart : public ICUDateFunc {
 	static void AddLastDayFunctions(const Identifier &name, ExtensionLoader &loader) {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetLastDayFunction<timestamp_tz_t>(LogicalType::TIMESTAMP_TZ));
+		// non-Gregorian calendars can fail for extreme timestamps - cleared in the bind for the Gregorian calendar
 		set.SetFallible();
 		loader.RegisterFunction(set);
 	}
@@ -646,6 +657,7 @@ struct ICUDatePart : public ICUDateFunc {
 	static void AddMonthNameFunctions(const Identifier &name, ExtensionLoader &loader) {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetMonthNameFunction<timestamp_tz_t>(LogicalType::TIMESTAMP_TZ));
+		// non-Gregorian calendars can fail for extreme timestamps - cleared in the bind for the Gregorian calendar
 		set.SetFallible();
 		loader.RegisterFunction(set);
 	}
@@ -667,6 +679,7 @@ struct ICUDatePart : public ICUDateFunc {
 	static void AddDayNameFunctions(const Identifier &name, ExtensionLoader &loader) {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetDayNameFunction<timestamp_tz_t>(LogicalType::TIMESTAMP_TZ));
+		// non-Gregorian calendars can fail for extreme timestamps - cleared in the bind for the Gregorian calendar
 		set.SetFallible();
 		loader.RegisterFunction(set);
 	}

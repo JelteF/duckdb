@@ -175,16 +175,20 @@ struct ToMicroSecondsOperator {
 	}
 };
 
-template <typename OP>
+//! INT32_CAN_FAIL is false for operators that store an INTEGER in an interval field as is
+template <typename OP, bool INT32_CAN_FAIL = true>
 ScalarFunctionSet GetIntegerIntervalFunctions() {
 	ScalarFunctionSet function_set;
 	ScalarFunction int32_fun({}, LogicalType::INTERVAL, ScalarFunction::UnaryFunction<int32_t, interval_t, OP>);
 	int32_fun.GetSignature().AddParameter("integer", LogicalType::INTEGER);
+	if constexpr (INT32_CAN_FAIL) {
+		int32_fun.SetFallible();
+	}
 	function_set.AddFunction(int32_fun);
 	ScalarFunction int64_fun({}, LogicalType::INTERVAL, ScalarFunction::UnaryFunction<int64_t, interval_t, OP>);
 	int64_fun.GetSignature().AddParameter("integer", LogicalType::BIGINT);
+	int64_fun.SetFallible();
 	function_set.AddFunction(int64_fun);
-	function_set.SetFallible();
 	return function_set;
 }
 
@@ -211,7 +215,7 @@ ScalarFunctionSet ToQuartersFun::GetFunctions() {
 }
 
 ScalarFunctionSet ToMonthsFun::GetFunctions() {
-	return GetIntegerIntervalFunctions<ToMonthsOperator>();
+	return GetIntegerIntervalFunctions<ToMonthsOperator, false>();
 }
 
 ScalarFunctionSet ToWeeksFun::GetFunctions() {
@@ -219,7 +223,7 @@ ScalarFunctionSet ToWeeksFun::GetFunctions() {
 }
 
 ScalarFunctionSet ToDaysFun::GetFunctions() {
-	return GetIntegerIntervalFunctions<ToDaysOperator>();
+	return GetIntegerIntervalFunctions<ToDaysOperator, false>();
 }
 
 ScalarFunction ToHoursFun::GetFunction() {
@@ -258,7 +262,6 @@ ScalarFunction ToMicrosecondsFun::GetFunction() {
 	ScalarFunction function({}, LogicalType::INTERVAL,
 	                        ScalarFunction::UnaryFunction<int64_t, interval_t, ToMicroSecondsOperator>);
 	function.GetSignature().AddParameter("integer", LogicalType::BIGINT);
-	function.SetFallible();
 	return function;
 }
 
