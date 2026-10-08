@@ -18,6 +18,9 @@ namespace duckdb {
 namespace regexp_util {
 
 bool TryParseConstantPattern(optional<Value> pattern_value, string &constant_string);
+//! Whether running a regex function with this (possibly constant) pattern can throw at execution time. A pattern
+//! that is not a constant can be invalid, and \C can match part of a multi-byte character, producing invalid UTF-8.
+bool RegexPatternCanThrow(const optional<Value> &pattern_value, duckdb_re2::RE2::Options options);
 void ParseRegexOptions(const string &options, duckdb_re2::RE2::Options &result, bool *global_replace = nullptr,
                        bool *no_match_returns_input = nullptr);
 void ParseRegexOptions(const Value &options_str, RE2::Options &target, bool *global_replace = nullptr,

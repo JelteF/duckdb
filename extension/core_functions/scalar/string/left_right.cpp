@@ -92,17 +92,14 @@ ScalarFunction LeftGraphemeFun::GetFunction() {
 template <class OP>
 static string_t RightScalarFunction(Vector &result, const string_t str, int64_t pos) {
 	int64_t num_characters = OP::template Operation<string_t, int64_t>(str);
-	if (pos >= 0) {
-		int64_t len = MinValue<int64_t>(num_characters, pos);
-		int64_t start = num_characters - len + 1;
-		return OP::Substring(result, str, start, len);
-	}
-
 	int64_t len = 0;
-	if (pos != std::numeric_limits<int64_t>::min()) {
+	if (pos >= 0) {
+		len = MinValue<int64_t>(num_characters, pos);
+	} else if (pos != std::numeric_limits<int64_t>::min()) {
 		len = num_characters - MinValue<int64_t>(num_characters, -pos);
 	}
-	int64_t start = num_characters - len + 1;
+	// an empty result at the end of a maximum size string would be an offset beyond what substring supports
+	int64_t start = len == 0 ? 1 : num_characters - len + 1;
 	return OP::Substring(result, str, start, len);
 }
 
@@ -117,16 +114,12 @@ static void RightFunction(DataChunk &args, ExpressionState &state, Vector &resul
 ScalarFunction RightFun::GetFunction() {
 	ScalarFunction function({}, LogicalType::VARCHAR, RightFunction<LeftRightUnicode>);
 	function.GetSignature().AddParameter("string", LogicalType::VARCHAR).AddParameter("count", LogicalType::BIGINT);
-	// throws if the resulting substring is out of the supported range
-	function.SetFallible();
 	return function;
 }
 
 ScalarFunction RightGraphemeFun::GetFunction() {
 	ScalarFunction function({}, LogicalType::VARCHAR, RightFunction<LeftRightGrapheme>);
 	function.GetSignature().AddParameter("string", LogicalType::VARCHAR).AddParameter("count", LogicalType::BIGINT);
-	// throws if the resulting substring is out of the supported range
-	function.SetFallible();
 	return function;
 }
 
