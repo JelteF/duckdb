@@ -148,7 +148,6 @@ ScalarFunctionSet JSONFunctions::GetDeepMergeFunction() {
 	fun.GetSignature().AddParameter("json1", LogicalType::JSON()).AddParameter("json2", LogicalType::JSON());
 	fun.GetSignature().AddArgs("args", LogicalType::JSON());
 	fun.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
-	fun.SetFallible();
 
 	return ScalarFunctionSet(fun);
 }

@@ -502,7 +502,7 @@ ScalarFunctionSet JSONFunctions::GetAsGeoJSONFunction() {
 	ScalarFunctionSet set("st_asgeojson");
 	ScalarFunction fun({}, LogicalType::JSON(), AsGeoJSONFunction, nullptr, nullptr, JSONFunctionLocalState::Init);
 	fun.GetSignature().AddParameter("geom", LogicalType::GEOMETRY());
-	fun.SetFallible();
+	// a GEOMETRY is valid WKB, so the reader errors are as unreachable as they are in ST_AsText
 	set.AddFunction(fun);
 	return set;
 }
