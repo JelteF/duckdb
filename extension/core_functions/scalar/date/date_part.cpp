@@ -1258,6 +1258,11 @@ int64_t DatePart::EpochMillisOperator::Operation(dtime_t input) {
 }
 
 template <>
+int64_t DatePart::EpochMillisOperator::Operation(dtime_ns_t input) {
+	return DatePart::EpochMillisOperator::Operation<dtime_t, int64_t>(AsTime::Operation<dtime_ns_t, dtime_t>(input));
+}
+
+template <>
 int64_t DatePart::EpochMillisOperator::Operation(dtime_tz_t input) {
 	return DatePart::EpochMillisOperator::Operation<dtime_t, int64_t>(input.time());
 }

@@ -16,3 +16,8 @@ query I
 select extract(seconds from TIME '14:21:13')
 ----
 13
+
+query III
+select epoch_ms(t), epoch_us(t), epoch_ns(t) from (values ('14:21:13.123456789'::TIME_NS)) v(t)
+----
+51673123	51673123456	51673123456789
