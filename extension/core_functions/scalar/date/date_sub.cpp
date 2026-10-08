@@ -432,6 +432,51 @@ void DateSubFunction(DataChunk &args, ExpressionState &state, Vector &result) {
 	}
 }
 
+//! Whether a valid date part can make date_sub throw an execution error for the given type
+bool DateSubCanThrow(DatePartSpecifier part, LogicalTypeId type) {
+	switch (type) {
+	case LogicalTypeId::TIMESTAMP:
+		// month based parts compute the age, the others subtract microseconds which can overflow
+		switch (part) {
+		case DatePartSpecifier::YEAR:
+		case DatePartSpecifier::ISOYEAR:
+		case DatePartSpecifier::MONTH:
+		case DatePartSpecifier::DECADE:
+		case DatePartSpecifier::CENTURY:
+		case DatePartSpecifier::MILLENNIUM:
+		case DatePartSpecifier::QUARTER:
+			return false;
+		default:
+			return true;
+		}
+	case LogicalTypeId::TIME:
+		return false;
+	default:
+		// dates are converted to timestamps, which fails for dates outside of the timestamp range
+		return true;
+	}
+}
+
+unique_ptr<FunctionData> DateSubBind(BindScalarFunctionInput &input) {
+	auto part = input.TryGetConstant(0);
+	if (!part || part->IsNull()) {
+		return nullptr;
+	}
+	auto part_string = part->DefaultTryCastAs(LogicalType::VARCHAR);
+	if (!part_string || part_string->IsNull()) {
+		return nullptr;
+	}
+	DatePartSpecifier specifier;
+	if (!TryGetDatePartSpecifier(StringValue::Get(*part_string), specifier)) {
+		return nullptr;
+	}
+	auto &bound_function = input.GetBoundFunction();
+	if (!DateSubCanThrow(specifier, bound_function.GetArguments()[1].id())) {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+	return nullptr;
+}
+
 } // namespace
 
 // Names the "part,startdate,enddate" triple shared by date_sub's per-type overloads.
@@ -451,8 +496,9 @@ ScalarFunctionSet DateSubFun::GetFunctions() {
 	    ScalarFunction({}, LogicalType::BIGINT, DateSubFunction<timestamp_t>), LogicalType::TIMESTAMP));
 	date_sub.AddFunction(NameDateSubPartStartEndArguments(
 	    ScalarFunction({}, LogicalType::BIGINT, DateSubFunction<dtime_t>), LogicalType::TIME));
-	// throws for unsupported date parts, and when the difference overflows
+	// throws for unrecognized date parts, and when the difference overflows - a constant part is checked in the bind
 	date_sub.SetFallible();
+	date_sub.ApplyToFunctions([](ScalarFunction &function) { function.SetBindCallback(DateSubBind); });
 	date_sub.SetArgProperties(1, ArgProperties().NonIncreasing());
 	date_sub.SetArgProperties(2, ArgProperties().NonDecreasing());
 	return date_sub;

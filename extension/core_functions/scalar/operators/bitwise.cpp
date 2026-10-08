@@ -118,8 +118,9 @@ ScalarFunctionSet BitwiseAndFun::GetFunctions() {
 	}
 	ScalarFunction bit_fun({}, LogicalType::BIT, BitwiseANDOperation);
 	bit_fun.GetSignature().AddParameter("left", LogicalType::BIT).AddParameter("right", LogicalType::BIT);
+	// only bit strings can fail, when their sizes differ
+	bit_fun.SetFallible();
 	functions.AddFunction(bit_fun);
-	functions.SetFallible();
 	return functions;
 }
 
@@ -157,8 +158,9 @@ ScalarFunctionSet BitwiseOrFun::GetFunctions() {
 	}
 	ScalarFunction bit_fun({}, LogicalType::BIT, BitwiseOROperation);
 	bit_fun.GetSignature().AddParameter("left", LogicalType::BIT).AddParameter("right", LogicalType::BIT);
+	// only bit strings can fail, when their sizes differ
+	bit_fun.SetFallible();
 	functions.AddFunction(bit_fun);
-	functions.SetFallible();
 	return functions;
 }
 
@@ -196,8 +198,9 @@ ScalarFunctionSet BitwiseXorFun::GetFunctions() {
 	}
 	ScalarFunction bit_fun({}, LogicalType::BIT, BitwiseXOROperation);
 	bit_fun.GetSignature().AddParameter("left", LogicalType::BIT).AddParameter("right", LogicalType::BIT);
+	// only bit strings can fail, when their sizes differ
+	bit_fun.SetFallible();
 	functions.AddFunction(bit_fun);
-	functions.SetFallible();
 	return functions;
 }
 
@@ -235,7 +238,6 @@ ScalarFunctionSet BitwiseNotFun::GetFunctions() {
 	ScalarFunction bit_fun({}, LogicalType::BIT, BitwiseNOTOperation);
 	bit_fun.GetSignature().AddParameter("input", LogicalType::BIT);
 	functions.AddFunction(bit_fun);
-	functions.SetFallible();
 	return functions;
 }
 
@@ -357,7 +359,6 @@ ScalarFunctionSet RightShiftFun::GetFunctions() {
 	ScalarFunction bit_fun({}, LogicalType::BIT, BitwiseShiftRightOperation);
 	bit_fun.GetSignature().AddParameter("input", LogicalType::BIT).AddParameter("shift", LogicalType::INTEGER);
 	functions.AddFunction(bit_fun);
-	functions.SetFallible();
 	return functions;
 }
 

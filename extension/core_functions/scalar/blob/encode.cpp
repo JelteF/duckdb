@@ -102,6 +102,23 @@ void BinaryDecodeFunction(DataChunk &args, ExpressionState &state, Vector &resul
 	StringVector::AddHeapReference(result, args.data[0]);
 }
 
+//! Only the 'strict' error behavior (or an unrecognized one) can throw
+unique_ptr<FunctionData> BinaryDecodeBind(BindScalarFunctionInput &input) {
+	auto error_option = input.TryGetConstant(1);
+	if (!error_option || error_option->IsNull()) {
+		return nullptr;
+	}
+	auto error_option_string = error_option->DefaultTryCastAs(LogicalType::VARCHAR);
+	if (!error_option_string || error_option_string->IsNull()) {
+		return nullptr;
+	}
+	auto &option = StringValue::Get(*error_option_string);
+	if (StringUtil::CIEquals(option, "replace") || StringUtil::CIEquals(option, "ignore")) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+	return nullptr;
+}
+
 } // namespace
 
 ScalarFunction EncodeFun::GetFunction() {
@@ -116,7 +133,7 @@ ScalarFunctionSet DecodeFun::GetFunctions() {
 	ScalarFunction unary_function({}, LogicalType::VARCHAR, UnaryDecodeFunction);
 	unary_function.GetSignature().AddParameter("blob", LogicalType::BLOB);
 
-	ScalarFunction binary_function({}, LogicalType::VARCHAR, BinaryDecodeFunction);
+	ScalarFunction binary_function({}, LogicalType::VARCHAR, BinaryDecodeFunction, BinaryDecodeBind);
 	binary_function.GetSignature()
 	    .AddParameter("blob", LogicalType::BLOB)
 	    .AddParameter("error_option", LogicalType::VARCHAR);

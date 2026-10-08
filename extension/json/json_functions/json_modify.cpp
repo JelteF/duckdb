@@ -66,7 +66,12 @@ public:
 				path = path_val.DefaultCastAs(LogicalType::VARCHAR).GetValue<string>();
 			}
 		}
-		return make_uniq<JSONModifyFunctionData>(constant, std::move(path));
+		auto result = make_uniq<JSONModifyFunctionData>(constant, std::move(path));
+		// only parsing the path can throw, which is done here for a constant path (JSON Pointers cannot be invalid)
+		if (result->use_elements || (result->constant && !result->path.empty() && result->path[0] == '/')) {
+			input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+		}
+		return std::move(result);
 	}
 
 public:
@@ -367,7 +372,7 @@ ScalarFunctionSet JSONFunctions::GetSetFunction() {
 	    .AddParameter("json", LogicalType::JSON())
 	    .AddParameter("path", LogicalType::VARCHAR)
 	    .AddParameter("value", LogicalType::JSON());
-	// throws for invalid JSON paths
+	// throws for invalid JSON paths - cleared in the bind for a constant path that is valid
 	fun.SetFallible();
 	return ScalarFunctionSet(fun);
 }
@@ -379,7 +384,7 @@ ScalarFunctionSet JSONFunctions::GetInsertFunction() {
 	    .AddParameter("json", LogicalType::JSON())
 	    .AddParameter("path", LogicalType::VARCHAR)
 	    .AddParameter("value", LogicalType::JSON());
-	// throws for invalid JSON paths
+	// throws for invalid JSON paths - cleared in the bind for a constant path that is valid
 	fun.SetFallible();
 	return ScalarFunctionSet(fun);
 }
@@ -391,7 +396,7 @@ ScalarFunctionSet JSONFunctions::GetReplaceFunction() {
 	    .AddParameter("json", LogicalType::JSON())
 	    .AddParameter("path", LogicalType::VARCHAR)
 	    .AddParameter("value", LogicalType::JSON());
-	// throws for invalid JSON paths
+	// throws for invalid JSON paths - cleared in the bind for a constant path that is valid
 	fun.SetFallible();
 	return ScalarFunctionSet(fun);
 }
@@ -400,7 +405,7 @@ ScalarFunctionSet JSONFunctions::GetRemoveFunction() {
 	ScalarFunction fun("json_remove", {}, LogicalType::JSON(), JsonRemoveFunction, JSONModifyFunctionData::Bind,
 	                   nullptr, JSONFunctionLocalState::Init);
 	fun.GetSignature().AddParameter("json", LogicalType::JSON()).AddParameter("path", LogicalType::VARCHAR);
-	// throws for invalid JSON paths
+	// throws for invalid JSON paths - cleared in the bind for a constant path that is valid
 	fun.SetFallible();
 	return ScalarFunctionSet(fun);
 }

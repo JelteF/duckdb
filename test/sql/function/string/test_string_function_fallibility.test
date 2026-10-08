@@ -1,0 +1,176 @@
+# name: test/sql/function/string/test_string_function_fallibility.test
+# description: String functions that are (conditionally) marked as not throwing still throw proper errors where they can
+# group: [string]
+
+statement ok
+CREATE TABLE strs AS SELECT * FROM (VALUES ('héllo world'), ('abc'), (NULL)) v(s);
+
+statement ok
+CREATE TABLE patterns AS SELECT * FROM (VALUES ('héllo', '('), ('world', 'l')) v(s, p);
+
+# right does not throw
+statement ok
+CREATE TABLE rights AS SELECT * FROM (VALUES ('héllo', 2, 3), ('', -100, 100), ('x', 10, -10)) v(s, lo, hi);
+
+query III
+SELECT right(s, lo), right(s, hi), right_grapheme(s, lo) FROM rights ORDER BY ALL;
+----
+(empty)	(empty)	(empty)
+lo	llo	lo
+x	(empty)	x
+
+# regexp_matches / regexp_full_match
+query IIII
+SELECT regexp_matches(s, 'l+'), regexp_full_match(s, 'a.c'), regexp_matches(s, 'L', 'i'), regexp_matches(s, NULL) FROM strs ORDER BY ALL;
+----
+false	true	false	NULL
+true	false	true	NULL
+NULL	NULL	NULL	NULL
+
+statement error
+SELECT regexp_matches(s, p) FROM patterns;
+----
+Invalid Input Error: missing ): (
+
+statement error
+SELECT regexp_full_match(s, p) FROM patterns;
+----
+Invalid Input Error: missing ): (
+
+# regexp_split_to_array / string_split_regex
+query II
+SELECT regexp_split_to_array(s, ' '), string_split_regex(s, 'L', 'i') FROM strs ORDER BY ALL;
+----
+[abc]	[abc]
+[héllo, world]	[hé, '', o wor, d]
+NULL	NULL
+
+statement error
+SELECT regexp_split_to_array(s, p) FROM patterns;
+----
+Invalid Input Error: missing ): (
+
+# regexp_replace
+query IIII
+SELECT regexp_replace(s, '(l+)', '<\1>'), regexp_replace(s, 'L', 'x', 'gi'), regexp_replace(s, 'l', NULL), regexp_replace(s, NULL, 'x') FROM strs ORDER BY ALL;
+----
+abc	abc	NULL	NULL
+hé<ll>o world	héxxo worxd	NULL	NULL
+NULL	NULL	NULL	NULL
+
+statement error
+SELECT regexp_replace(s, 'l', '\2', 'g') FROM strs;
+----
+Invalid Input Error: Invalid replacement string for regexp_replace
+
+statement error
+SELECT regexp_replace(s, p, 'x') FROM patterns;
+----
+Invalid Input Error: missing ): (
+
+statement error
+SELECT regexp_replace(s, 'h\C', '') FROM strs;
+----
+Invalid Input Error: Regular expression result is not valid UTF-8
+
+# regexp_extract
+query IIII
+SELECT regexp_extract(s, '(l+)', 1), regexp_extract(s, '(l+)', 5), regexp_extract(s, 'L+', 'i'), regexp_extract(s, '(?P<x>h.)', ['x']) FROM strs ORDER BY ALL;
+----
+(empty)	(empty)	(empty)	{'x': ''}
+ll	(empty)	ll	{'x': hé}
+NULL	NULL	NULL	NULL
+
+statement error
+SELECT regexp_extract(s, 'h\C') FROM strs;
+----
+Invalid Input Error: Regular expression result is not valid UTF-8
+
+statement error
+SELECT regexp_extract(s, '(?P<a>h\C)', ['a']) FROM strs;
+----
+Invalid Input Error: Regular expression result is not valid UTF-8
+
+# regexp_extract_all
+query IIIII
+SELECT regexp_extract_all(s, 'l'), regexp_extract_all(s, '(l)(o)', 2), regexp_extract_all(s, '(l)', -1), regexp_extract_all(s, '(l)', NULL), regexp_extract_all(s, '(?P<x>l.)', ['x']) FROM strs ORDER BY ALL;
+----
+[]	[]	[]	NULL	[]
+[l, l, l]	[o]	[]	NULL	[{'x': ll}, {'x': ld}]
+NULL	NULL	NULL	NULL	NULL
+
+statement error
+SELECT regexp_extract_all(s, '(l)', 2) FROM strs;
+----
+Invalid Input Error: Pattern has 1 groups. Cannot access group 2
+
+statement error
+SELECT regexp_extract_all(s, '(l)', i::INTEGER) FROM strs, range(3) t(i);
+----
+Invalid Input Error: Pattern has 1 groups. Cannot access group 2
+
+statement error
+SELECT regexp_extract_all(s, p) FROM patterns;
+----
+Invalid Input Error: Pattern failed to parse
+
+statement error
+SELECT regexp_extract_all(s, 'h\C') FROM strs;
+----
+Invalid Input Error: Regular expression result is not valid UTF-8
+
+statement error
+SELECT regexp_extract_all(s, '(?P<a>h\C)', ['a']) FROM strs;
+----
+Invalid Input Error: Regular expression result is not valid UTF-8
+
+# substring with a NULL offset or length always returns NULL
+query IIIII
+SELECT substring(s, NULL), substring(s, NULL, 2), substring(s, 2, NULL), substring(s, 2, 3), substring_grapheme(s, NULL, 2) FROM strs ORDER BY ALL;
+----
+NULL	NULL	NULL	bc	NULL
+NULL	NULL	NULL	éll	NULL
+NULL	NULL	NULL	NULL	NULL
+
+statement error
+SELECT substring(s, 9223372036854775807) FROM strs;
+----
+Out of Range Error: Substring offset outside of supported range
+
+# decode with a constant error option
+statement ok
+CREATE TABLE blobs AS SELECT * FROM (VALUES ('\xFF\x41'::BLOB, 'strict'), ('\x41'::BLOB, 'replace')) v(b, opt);
+
+query II
+SELECT decode(b, 'replace'), decode(b, 'ignore') FROM blobs ORDER BY ALL;
+----
+?A	A
+A	A
+
+statement error
+SELECT decode(b) FROM blobs;
+----
+Conversion Error: Failure in decode
+
+statement error
+SELECT decode(b, 'strict') FROM blobs;
+----
+Conversion Error: Failure in decode
+
+statement error
+SELECT decode(b, opt) FROM blobs;
+----
+Conversion Error: Failure in decode
+
+# parse_duckdb_log_message only throws for structured log types
+query I
+SELECT parse_duckdb_log_message('QueryLog', s) FROM strs ORDER BY ALL;
+----
+{'message': abc}
+{'message': héllo world}
+{'message': NULL}
+
+statement error
+SELECT parse_duckdb_log_message('FileSystem', s) FROM strs;
+----
+Conversion Error

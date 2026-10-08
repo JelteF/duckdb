@@ -163,9 +163,20 @@ struct ICUDateTrunc : public ICUDateFunc {
 		}
 	}
 
+	static unique_ptr<FunctionData> DateTruncBind(BindScalarFunctionInput &input) {
+		auto result = Bind(input);
+		auto part_value = input.TryGetConstant(0);
+		DatePartSpecifier part;
+		if (part_value && !part_value->IsNull() && TryGetDatePartSpecifier(part_value->GetValue<string>(), part) &&
+		    TryTruncationFactory(part)) {
+			SetCannotErrorIfGregorian(input.GetBoundFunction(), result->Cast<BindData>());
+		}
+		return result;
+	}
+
 	template <typename TA>
 	static ScalarFunction GetDateTruncFunction(const LogicalTypeId &type) {
-		ScalarFunction fun({}, LogicalType::TIMESTAMP_TZ, ICUDateTruncFunction<TA>, Bind);
+		ScalarFunction fun({}, LogicalType::TIMESTAMP_TZ, ICUDateTruncFunction<TA>, DateTruncBind);
 		fun.GetSignature().AddParameter("part", LogicalType::VARCHAR).AddParameter("timestamp", type);
 		return fun;
 	}
@@ -173,7 +184,8 @@ struct ICUDateTrunc : public ICUDateFunc {
 	static void AddBinaryTimestampFunction(const Identifier &name, ExtensionLoader &loader) {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetDateTruncFunction<timestamp_tz_t>(LogicalType::TIMESTAMP_TZ));
-		// throws for unrecognized part specifiers and for dates that overflow the timestamp range
+		// throws for unrecognized part specifiers, and non-Gregorian calendars can fail for extreme timestamps -
+		// cleared in the bind for a constant part with the Gregorian calendar
 		set.SetFallible();
 		set.SetArgProperties(1, ArgProperties().NonDecreasing());
 		loader.RegisterFunction(set);
@@ -181,6 +193,14 @@ struct ICUDateTrunc : public ICUDateFunc {
 };
 
 ICUDateFunc::part_trunc_t ICUDateFunc::TruncationFactory(DatePartSpecifier type) {
+	auto result = TryTruncationFactory(type);
+	if (!result) {
+		throw NotImplementedException("Specifier type not implemented for ICU DATETRUNC");
+	}
+	return result;
+}
+
+ICUDateFunc::part_trunc_t ICUDateFunc::TryTruncationFactory(DatePartSpecifier type) {
 	switch (type) {
 	case DatePartSpecifier::ERA:
 		return ICUDateTrunc::TruncEra;
@@ -219,7 +239,7 @@ ICUDateFunc::part_trunc_t ICUDateFunc::TruncationFactory(DatePartSpecifier type)
 	case DatePartSpecifier::MICROSECONDS:
 		return ICUDateTrunc::TruncMicrosecond;
 	default:
-		throw NotImplementedException("Specifier type not implemented for ICU DATETRUNC");
+		return nullptr;
 	}
 }
 

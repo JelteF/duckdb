@@ -1,0 +1,223 @@
+# name: test/sql/function/numeric/test_arithmetic_fallibility.test
+# description: Arithmetic and bitwise operators that are (conditionally) marked as not throwing still throw proper errors where they can
+# group: [numeric]
+
+statement ok
+CREATE TABLE doubles AS SELECT * FROM (VALUES (1.7976931348623157e308::DOUBLE, -1.7976931348623157e308::DOUBLE), (0::DOUBLE, 0::DOUBLE), ('nan'::DOUBLE, 'inf'::DOUBLE)) t(a, b);
+
+query IIII
+SELECT a + a, a - b, a * a, -b FROM doubles ORDER BY ALL
+----
+0.0	0.0	0.0	0.0
+inf	inf	inf	1.7976931348623157e+308
+nan	nan	nan	-inf
+
+statement ok
+CREATE TABLE floats AS SELECT * FROM (VALUES (3.4028235e38::FLOAT, -3.4028235e38::FLOAT), (0::FLOAT, 0::FLOAT), ('nan'::FLOAT, 'inf'::FLOAT)) t(a, b);
+
+query IIII
+SELECT a + a, a - b, a * a, -b FROM floats ORDER BY ALL
+----
+0.0	0.0	0.0	0.0
+inf	inf	inf	3.4028235e+38
+nan	nan	nan	-inf
+
+# integer arithmetic can still overflow
+statement ok
+CREATE TABLE ints AS SELECT * FROM (VALUES (2147483647, -2147483648)) t(a, b);
+
+statement error
+SELECT a + a FROM ints
+----
+Out of Range Error: Overflow in addition
+
+statement error
+SELECT b - a FROM ints
+----
+Out of Range Error: Overflow in subtraction
+
+statement error
+SELECT a * a FROM ints
+----
+Out of Range Error: Overflow in multiplication
+
+statement error
+SELECT -b FROM ints
+----
+Out of Range Error: Overflow in negation
+
+statement error
+SELECT b // -1 FROM ints
+----
+Out of Range Error: Overflow in division
+
+statement error
+SELECT b % -1 FROM ints
+----
+Out of Range Error: Overflow in division
+
+# signed integer division can overflow even if division by zero does not throw
+statement ok
+SET error_on_division_by_zero = false
+
+statement error
+SELECT b // -1 FROM ints
+----
+Out of Range Error: Overflow in division
+
+query II
+SELECT a // 0, a % 0 FROM ints
+----
+NULL	NULL
+
+query II
+SELECT a::UINTEGER // 0, a::UINTEGER % 0 FROM ints
+----
+NULL	NULL
+
+query I
+SELECT a // 0 FROM doubles
+----
+NULL
+NULL
+NULL
+
+query I
+SELECT a::DECIMAL(12, 2) % 0 FROM ints
+----
+NULL
+
+statement ok
+SET ieee_floating_point_ops = false
+
+query II
+SELECT a / 0, a % 0 FROM doubles
+----
+NULL	NULL
+NULL	NULL
+NULL	NULL
+
+statement ok
+RESET error_on_division_by_zero
+
+statement error
+SELECT a / 0 FROM doubles
+----
+Invalid Input Error: Division by zero
+
+statement error
+SELECT a % 0 FROM doubles
+----
+Invalid Input Error: Division by zero
+
+statement ok
+RESET ieee_floating_point_ops
+
+statement error
+SELECT a // 0 FROM doubles
+----
+Invalid Input Error: Division by zero
+
+statement error
+SELECT a::DECIMAL(12, 2) % 0 FROM ints
+----
+Invalid Input Error: Division by zero
+
+# with IEEE semantics floating point division never throws
+query II
+SELECT a / 0, a % 0 FROM doubles ORDER BY ALL
+----
+inf	nan
+nan	nan
+nan	nan
+
+# changing the setting after preparing a statement
+statement ok
+PREPARE div_by_zero AS SELECT a // 0 FROM ints
+
+statement ok
+SET error_on_division_by_zero = false
+
+query I
+EXECUTE div_by_zero
+----
+NULL
+
+statement ok
+PREPARE div_by_zero_null AS SELECT a // 0 FROM ints
+
+statement ok
+RESET error_on_division_by_zero
+
+statement error
+EXECUTE div_by_zero_null
+----
+Invalid Input Error: Division by zero
+
+# decimal arithmetic only needs overflow checks when the result type can not hold every result
+statement ok
+CREATE TABLE decimals AS SELECT 9999999.99::DECIMAL(9, 2) a, 99999999999999999999999999999999999999::DECIMAL(38, 0) b, 99999999.99::DECIMAL(10, 2) c
+
+query III
+SELECT a + a, a - a, a * a FROM decimals
+----
+19999999.98	0.00	99999999800000.0001
+
+statement error
+SELECT c * c FROM decimals
+----
+Out of Range Error: Overflow in multiplication of DECIMAL(18)
+
+statement error
+SELECT b + b FROM decimals
+----
+Out of Range Error: Overflow in addition of DECIMAL(38)
+
+statement error
+SELECT -b - b FROM decimals
+----
+Out of Range Error: Overflow in subtract of DECIMAL(38)
+
+statement error
+SELECT b * c FROM decimals
+----
+Out of Range Error: Overflow in multiplication of DECIMAL(38)
+
+# bitwise operators only throw for bit strings of different sizes (and left shifts)
+statement ok
+CREATE TABLE tinyints AS SELECT * FROM (VALUES (-127::TINYINT), (5::TINYINT)) v(t);
+
+query IIIIII
+SELECT t & 3, t | 3, xor(t, 3), ~t, t >> 1, t >> 10 FROM tinyints ORDER BY ALL;
+----
+1	-125	-126	126	-64	0
+1	7	6	-6	2	0
+
+query IIII
+SELECT b & b, b | b, xor(b, b), ~b >> 1 FROM (VALUES ('1010'::BIT), ('0011'::BIT)) v(b) ORDER BY ALL;
+----
+0011	0011	0000	0110
+1010	1010	0000	0010
+
+statement ok
+CREATE TABLE bits AS SELECT * FROM (VALUES ('1010'::BIT, '11'::BIT)) v(a, b);
+
+statement error
+SELECT a & b FROM bits;
+----
+Invalid Input Error: Cannot AND bit strings of different sizes
+
+statement error
+SELECT a | b FROM bits;
+----
+Invalid Input Error: Cannot OR bit strings of different sizes
+
+statement error
+SELECT xor(a, b) FROM bits;
+----
+Invalid Input Error: Cannot XOR bit strings of different sizes
+
+statement error
+SELECT t << 7 FROM tinyints;
+----
+Out of Range Error

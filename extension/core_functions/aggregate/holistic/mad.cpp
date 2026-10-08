@@ -316,7 +316,10 @@ AggregateFunction GetMedianAbsoluteDeviationAggregateFunctionInternal(const Logi
 
 AggregateFunction GetMedianAbsoluteDeviationAggregateFunction(const LogicalType &type) {
 	auto result = GetMedianAbsoluteDeviationAggregateFunctionInternal(type);
-	result.SetFallible();
+	// floating point deviations cannot overflow
+	if (type.id() != LogicalTypeId::FLOAT && type.id() != LogicalTypeId::DOUBLE) {
+		result.SetFallible();
+	}
 	return result;
 }
 

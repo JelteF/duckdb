@@ -62,7 +62,8 @@ struct BlobSliceOperations {
 	}
 
 	static string_t SliceValue(Vector &result, string_t input, int64_t begin, int64_t end) {
-		return SubstringASCII(result, input, begin + 1, end - begin);
+		// an empty slice at the end of a maximum size blob would be an offset beyond what substring supports
+		return SubstringASCII(result, input, begin == end ? 1 : begin + 1, end - begin);
 	}
 
 	static string_t SliceValueWithSteps(Vector &result, SelectionVector &sel, string_t input, int64_t begin,
@@ -77,7 +78,8 @@ struct StringSliceOperations {
 	}
 
 	static string_t SliceValue(Vector &result, string_t input, int64_t begin, int64_t end) {
-		return SubstringUnicode(result, input, begin + 1, end - begin);
+		// an empty slice at the end of a maximum size string would be an offset beyond what substring supports
+		return SubstringUnicode(result, input, begin == end ? 1 : begin + 1, end - begin);
 	}
 
 	static string_t SliceValueWithSteps(Vector &result, SelectionVector &sel, string_t input, int64_t begin,
@@ -468,10 +470,11 @@ ScalarFunctionSet ListSliceFun::GetFunctions() {
 	fun.SetStatisticsCallback(ArraySlicePropagateStats);
 	fun.SetUnbindCallback(ArraySliceUnbind);
 	fun.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
-	fun.SetFallible();
 	ScalarFunctionSet set;
 	set.AddFunction(fun);
 	fun.GetSignature().AddParameter("step", LogicalType::BIGINT);
+	// a step of zero is an error
+	fun.SetFallible();
 	set.AddFunction(fun);
 	return set;
 }

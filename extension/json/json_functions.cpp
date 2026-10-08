@@ -89,6 +89,12 @@ unique_ptr<FunctionData> JSONReadFunctionData::Bind(BindScalarFunctionInput &inp
 	if (path_type == JSONCommon::JSONPathType::WILDCARD) {
 		bound_function.SetReturnType(LogicalType::LIST(bound_function.GetReturnType()));
 	}
+	// JSON input is always valid, so the read can only throw for a path that is not validated here. Integral paths
+	// are always valid array indexes.
+	const auto &arguments = bound_function.GetArguments();
+	if (arguments[0].IsJSONType() && (constant || arguments[1].IsIntegral())) {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
 	return make_uniq<JSONReadFunctionData>(constant, std::move(path), len, path_type);
 }
 
@@ -133,6 +139,10 @@ unique_ptr<FunctionData> JSONReadManyFunctionData::Bind(BindScalarFunctionInput 
 		}
 	}
 
+	// JSON input is always valid and the paths were validated above, so the read cannot throw
+	if (input.GetBoundFunction().GetArguments()[0].IsJSONType()) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
 	return make_uniq<JSONReadManyFunctionData>(std::move(paths), std::move(lens));
 }
 

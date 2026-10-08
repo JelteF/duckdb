@@ -435,6 +435,42 @@ void DateDiffFunction(DataChunk &args, ExpressionState &state, Vector &result) {
 	}
 }
 
+//! Whether a valid date part can make date_diff throw an execution error for the given type (on overflow)
+bool DateDiffCanThrow(DatePartSpecifier part, LogicalTypeId type) {
+	switch (type) {
+	case LogicalTypeId::DATE:
+		// dates are converted to epoch microseconds, which can overflow
+		return part == DatePartSpecifier::MICROSECONDS || part == DatePartSpecifier::MILLISECONDS;
+	case LogicalTypeId::TIMESTAMP:
+		// the microsecond difference between timestamps can overflow
+		return part == DatePartSpecifier::MICROSECONDS;
+	case LogicalTypeId::TIME:
+		return false;
+	default:
+		return true;
+	}
+}
+
+unique_ptr<FunctionData> DateDiffBind(BindScalarFunctionInput &input) {
+	auto part = input.TryGetConstant(0);
+	if (!part || part->IsNull()) {
+		return nullptr;
+	}
+	auto part_string = part->DefaultTryCastAs(LogicalType::VARCHAR);
+	if (!part_string || part_string->IsNull()) {
+		return nullptr;
+	}
+	DatePartSpecifier specifier;
+	if (!TryGetDatePartSpecifier(StringValue::Get(*part_string), specifier)) {
+		return nullptr;
+	}
+	auto &bound_function = input.GetBoundFunction();
+	if (!DateDiffCanThrow(specifier, bound_function.GetArguments()[1].id())) {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+	return nullptr;
+}
+
 } // namespace
 
 // Names the "part,startdate,enddate" triple shared by date_diff's per-type overloads.
@@ -454,8 +490,9 @@ ScalarFunctionSet DateDiffFun::GetFunctions() {
 	    ScalarFunction({}, LogicalType::BIGINT, DateDiffFunction<timestamp_t>), LogicalType::TIMESTAMP));
 	date_diff.AddFunction(NamePartStartEndArguments(ScalarFunction({}, LogicalType::BIGINT, DateDiffFunction<dtime_t>),
 	                                                LogicalType::TIME));
-	// throws for unsupported date parts, and when the difference overflows
+	// throws for unrecognized date parts, and when the difference overflows - a constant part is checked in the bind
 	date_diff.SetFallible();
+	date_diff.ApplyToFunctions([](ScalarFunction &function) { function.SetBindCallback(DateDiffBind); });
 	date_diff.SetArgProperties(1, ArgProperties().NonIncreasing());
 	date_diff.SetArgProperties(2, ArgProperties().NonDecreasing());
 	return date_diff;

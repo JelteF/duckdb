@@ -31,6 +31,7 @@ struct ICUDateFunc {
 		duckdb::unique_ptr<FunctionData> Copy() const override;
 
 		void InitCalendar();
+		bool IsGregorian() const;
 	};
 
 	struct CastData : public BoundCastData {
@@ -83,6 +84,10 @@ struct ICUDateFunc {
 
 	//! Binds a default calendar object for use by the function
 	static duckdb::unique_ptr<FunctionData> Bind(BindScalarFunctionInput &input);
+	//! Marks the function as unable to throw if the bound calendar is the Gregorian one. Only valid for functions
+	//! that cannot throw other than when the calendar fails, which the Gregorian calendar never does for the
+	//! fields of a finite timestamp, but other calendars do for extreme timestamps.
+	static void SetCannotErrorIfGregorian(BoundScalarFunction &bound_function, const BindData &bind_data);
 	//! Initializes a CalendarCacheState from the function's BindData
 	static duckdb::unique_ptr<FunctionLocalState>
 	InitCalendarCache(ExpressionState &state, const BoundFunctionExpression &expr, FunctionData *bind_data);
@@ -126,6 +131,8 @@ struct ICUDateFunc {
 	//! Truncates the calendar time to the given part precision
 	typedef void (*part_trunc_t)(Calendar *calendar, uint64_t &micros);
 	static part_trunc_t TruncationFactory(DatePartSpecifier part);
+	//! Returns nullptr for parts that cannot be truncated to
+	static part_trunc_t TryTruncationFactory(DatePartSpecifier part);
 	static timestamp_tz_t CurrentMidnight(Calendar *calendar, ExpressionState &state);
 
 	//! Subtracts the two times at the given part precision

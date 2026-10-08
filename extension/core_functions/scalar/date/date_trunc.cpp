@@ -580,6 +580,23 @@ unique_ptr<FunctionData> DateTruncBind(BindScalarFunctionInput &input) {
 	return nullptr;
 }
 
+//! Truncating an interval is plain arithmetic, so only an unrecognized part can throw an execution error
+unique_ptr<FunctionData> DateTruncIntervalBind(BindScalarFunctionInput &input) {
+	auto part = input.TryGetConstant(0);
+	if (!part || part->IsNull()) {
+		return nullptr;
+	}
+	auto part_string = part->DefaultTryCastAs(LogicalType::VARCHAR);
+	if (!part_string || part_string->IsNull()) {
+		return nullptr;
+	}
+	DatePartSpecifier specifier;
+	if (TryGetDatePartSpecifier(StringValue::Get(*part_string), specifier)) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+	return nullptr;
+}
+
 } // namespace
 
 // Names the "part,timestamp" pair shared by date_trunc's per-type overloads.
@@ -597,7 +614,8 @@ ScalarFunctionSet DateTruncFun::GetFunctions() {
 	    ScalarFunction({}, LogicalType::TIMESTAMP, DateTruncFunction<date_t, timestamp_t>, DateTruncBind),
 	    LogicalType::DATE));
 	date_trunc.AddFunction(NamePartTimestampArguments(
-	    ScalarFunction({}, LogicalType::INTERVAL, DateTruncFunction<interval_t, interval_t>), LogicalType::INTERVAL));
+	    ScalarFunction({}, LogicalType::INTERVAL, DateTruncFunction<interval_t, interval_t>, DateTruncIntervalBind),
+	    LogicalType::INTERVAL));
 	date_trunc.ApplyToFunctions([](ScalarFunction &func) {
 		func.SetFallible();
 		func.SetArgProperties(1, ArgProperties().NonDecreasing());

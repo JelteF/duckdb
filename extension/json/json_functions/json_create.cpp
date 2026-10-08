@@ -1480,13 +1480,26 @@ unique_ptr<Expression> JSONFunctions::CreateJSONCopyToJSONExpression(ClientConte
 	return make_uniq<BoundFunctionExpression>(std::move(bound_function), std::move(children), std::move(bind_data));
 }
 
+//! A NULL key throws during execution, which cannot happen if all keys are constants that are not NULL
+static unique_ptr<FunctionData> JSONObjectBindFunction(BindScalarFunctionInput &input) {
+	auto result = JSONObjectBind(input);
+	for (idx_t key_idx = 0; key_idx < input.GetArguments().size(); key_idx += 2) {
+		auto key = input.TryGetConstant(key_idx);
+		if (!key || key->IsNull()) {
+			return result;
+		}
+	}
+	input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	return result;
+}
+
 ScalarFunctionSet JSONFunctions::GetObjectFunction() {
-	ScalarFunction fun("json_object", {}, LogicalType::JSON(), ObjectFunction, JSONObjectBind<BindScalarFunctionInput>,
-	                   nullptr, JSONFunctionLocalState::Init);
+	ScalarFunction fun("json_object", {}, LogicalType::JSON(), ObjectFunction, JSONObjectBindFunction, nullptr,
+	                   JSONFunctionLocalState::Init);
 	fun.GetSignature().AddArgs("args", LogicalType::ANY);
 	fun.SetResolveTypesCallback(JSONCreateResolveTypes<JSONObjectBind<ResolveScalarFunctionTypesInput>>);
 	fun.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
-	// throws if a key is NULL
+	// throws if a key is NULL - cleared in the bind if all keys are constants that are not NULL
 	fun.SetFallible();
 	return ScalarFunctionSet(fun);
 }

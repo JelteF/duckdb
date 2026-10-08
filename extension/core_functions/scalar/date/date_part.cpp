@@ -1258,6 +1258,11 @@ int64_t DatePart::EpochMillisOperator::Operation(dtime_t input) {
 }
 
 template <>
+int64_t DatePart::EpochMillisOperator::Operation(dtime_ns_t input) {
+	return DatePart::EpochMillisOperator::Operation<dtime_t, int64_t>(AsTime::Operation<dtime_ns_t, dtime_t>(input));
+}
+
+template <>
 int64_t DatePart::EpochMillisOperator::Operation(dtime_tz_t input) {
 	return DatePart::EpochMillisOperator::Operation<dtime_t, int64_t>(input.time());
 }
@@ -2157,6 +2162,8 @@ unique_ptr<FunctionData> DatePartBind(BindScalarFunctionInput &input) {
 	}
 	bound_function.SetFunctionCallback(DatePartUnaryCallback(part_code, type));
 	bound_function.SetStatisticsCallback(DatePartUnaryStatistics(part_code, type));
+	// the unary part operators only throw NotImplementedException (for unsupported part/type combinations)
+	bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 
 	return nullptr;
 }
@@ -2175,7 +2182,6 @@ ScalarFunctionSet GetGenericDatePartFunction(scalar_function_t date_func, scalar
 	ScalarFunction interval_fun({}, LogicalType::BIGINT, std::move(interval_func));
 	interval_fun.GetSignature().AddParameter("ts", LogicalType::INTERVAL);
 	operator_set.AddFunction(interval_fun);
-	operator_set.SetFallible();
 	return operator_set;
 }
 
@@ -2444,6 +2450,18 @@ void SetNonDecreasingExceptInterval(ScalarFunctionSet &functions) {
 	});
 }
 
+//! Marks the overloads taking one of the given types as their first argument as fallible
+void SetFallibleForTypes(ScalarFunctionSet &functions, const vector<LogicalType> &fallible_types) {
+	functions.ApplyToFunctions([&](ScalarFunction &function) {
+		auto &type = function.GetSignature().GetParameter(0).GetType();
+		for (auto &fallible_type : fallible_types) {
+			if (type == fallible_type) {
+				function.SetFallible();
+			}
+		}
+	});
+}
+
 } // namespace
 
 ScalarFunctionSet YearFun::GetFunctions() {
@@ -2483,9 +2501,7 @@ ScalarFunctionSet QuarterFun::GetFunctions() {
 }
 
 ScalarFunctionSet DayOfWeekFun::GetFunctions() {
-	auto set = GetDatePartFunction<DatePart::DayOfWeekOperator>();
-	set.SetFallible();
-	return set;
+	return GetDatePartFunction<DatePart::DayOfWeekOperator>();
 }
 
 ScalarFunctionSet ISODayOfWeekFun::GetFunctions() {
@@ -2519,10 +2535,10 @@ ScalarFunctionSet TimezoneFun::GetFunctions() {
 	ScalarFunction function({}, LogicalType::TIME_TZ,
 	                        DatePart::TimezoneOperator::BinaryFunction<interval_t, dtime_tz_t, dtime_tz_t>);
 	function.GetSignature().AddParameter("offset", LogicalType::INTERVAL).AddParameter("time_tz", LogicalType::TIME_TZ);
+	// throws if the offset is out of range
+	function.SetFallible();
 
 	operator_set.AddFunction(function);
-
-	operator_set.SetFallible();
 
 	return operator_set;
 }
@@ -2560,7 +2576,8 @@ ScalarFunctionSet EpochNsFun::GetFunctions() {
 	operator_set.AddFunction(tstz_ns_fun);
 	operator_set.SetUnaryArgProperties(ArgProperties().NonDecreasing());
 	// these overflow at the representable extremes, so the failure must be reportable
-	operator_set.SetFallible();
+	SetFallibleForTypes(operator_set,
+	                    {LogicalType::DATE, LogicalType::TIMESTAMP, LogicalType::TIMESTAMP_TZ, LogicalType::INTERVAL});
 	return operator_set;
 }
 
@@ -2576,7 +2593,7 @@ ScalarFunctionSet EpochUsFun::GetFunctions() {
 	operator_set.AddFunction(tstz_fun);
 	operator_set.SetUnaryArgProperties(ArgProperties().NonDecreasing());
 	// these overflow at the representable extremes, so the failure must be reportable
-	operator_set.SetFallible();
+	SetFallibleForTypes(operator_set, {LogicalType::DATE, LogicalType::INTERVAL});
 	return operator_set;
 }
 
@@ -2598,7 +2615,7 @@ ScalarFunctionSet EpochMsFun::GetFunctions() {
 
 	SetNonDecreasingExceptInterval(operator_set);
 	// these overflow at the representable extremes, so the failure must be reportable
-	operator_set.SetFallible();
+	SetFallibleForTypes(operator_set, {LogicalType::INTERVAL, LogicalType::BIGINT});
 	return operator_set;
 }
 
@@ -2680,11 +2697,12 @@ ScalarFunctionSet LastDayFun::GetFunctions() {
 	ScalarFunctionSet last_day;
 	ScalarFunction date_fun({}, LogicalType::DATE, DatePart::UnaryFunction<date_t, date_t, LastDayOperator>);
 	date_fun.GetSignature().AddParameter("ts", LogicalType::DATE);
+	// the last day of the month of the maximum date is out of range, timestamps have a smaller range than dates
+	date_fun.SetFallible();
 	last_day.AddFunction(date_fun);
 	ScalarFunction ts_fun({}, LogicalType::DATE, DatePart::UnaryFunction<timestamp_t, date_t, LastDayOperator>);
 	ts_fun.GetSignature().AddParameter("ts", LogicalType::TIMESTAMP);
 	last_day.AddFunction(ts_fun);
-	last_day.SetFallible();
 	last_day.SetUnaryArgProperties(ArgProperties().NonDecreasing());
 	return last_day;
 }

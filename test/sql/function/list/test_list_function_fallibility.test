@@ -1,0 +1,137 @@
+# name: test/sql/function/list/test_list_function_fallibility.test
+# description: List, array and map functions that are (conditionally) marked as not throwing still throw proper errors where they can
+# group: [list]
+
+statement ok
+CREATE TABLE lists AS SELECT * FROM (VALUES ([1, 2, 3], [[1, 2], [3, 4], [5, 6]]::INT[2][3]), ([], [[7, 8], [9, 10], [11, 12]]::INT[2][3]), (NULL, NULL)) v(l, a);
+
+# list_extract on lists returns NULL for out of range indexes
+query III
+SELECT l[2], list_extract(l, 5), list_element(l, -1) FROM lists ORDER BY ALL;
+----
+2	NULL	3
+NULL	NULL	NULL
+NULL	NULL	NULL
+
+# array_length
+query IIIIIII
+SELECT array_length(l), array_length(a), array_length(l, 1), array_length(a, 1), array_length(a, 2), array_length(l, NULL), array_length(a, NULL) FROM lists WHERE l IS NOT NULL ORDER BY ALL;
+----
+0	3	0	3	2	NULL	NULL
+3	3	3	3	2	NULL	NULL
+
+statement error
+SELECT array_length(a, 3) FROM lists;
+----
+Out of Range Error: array_length dimension '3' out of range (min: '1', max: '2')
+
+statement error
+SELECT array_length(a, 0) FROM lists;
+----
+Out of Range Error: array_length dimension '0' out of range (min: '1', max: '2')
+
+statement error
+SELECT array_length(a, i::BIGINT) FROM lists, range(1, 4) t(i);
+----
+Out of Range Error: array_length dimension '3' out of range (min: '1', max: '2')
+
+statement error
+SELECT array_length(l, 2) FROM lists;
+----
+Not implemented Error: array_length for lists with dimensions other than 1 not implemented
+
+# slicing without a step does not throw
+statement ok
+CREATE TABLE slices AS SELECT * FROM (VALUES ([1, 2, 3, 4], 'héllo', 'abc'::BLOB, 2, 3), ([], '', ''::BLOB, -100, 100), ([5], 'x', 'x'::BLOB, 10, -10)) v(l, s, b, lo, hi);
+
+query IIII
+SELECT l[lo:hi], s[lo:hi], array_slice(b, lo, hi), s[hi:] FROM slices ORDER BY ALL;
+----
+[]	(empty)	(empty)	(empty)
+[]	(empty)	(empty)	x
+[2, 3]	él	bc	llo
+
+statement error
+SELECT array_slice(l, lo, hi, lo - lo) FROM slices;
+----
+Invalid Input Error: Slice step cannot be zero
+
+# maps
+statement ok
+CREATE TABLE maps AS SELECT * FROM (VALUES (MAP {'a': 1, 'b': 2}), (MAP {}), (NULL)) v(m);
+
+query III
+SELECT map_keys(m), map_values(m), map() FROM maps ORDER BY ALL;
+----
+[]	[]	{}
+[a, b]	[1, 2]	{}
+NULL	NULL	{}
+
+# array_cross_product only throws for NULL elements
+statement ok
+CREATE TABLE vectors AS SELECT * FROM (VALUES ([1, 0, 0]::DOUBLE[3], [0, 1, 0]::DOUBLE[3]), ([0, 1, 0]::DOUBLE[3], [0, 0, 1]::DOUBLE[3])) v(a, b);
+
+query I
+SELECT array_cross_product(a, b) FROM vectors ORDER BY ALL;
+----
+[0.0, 0.0, 1.0]
+[1.0, 0.0, 0.0]
+
+statement ok
+CREATE TABLE null_vectors AS SELECT * FROM (VALUES ([1, NULL, 0]::DOUBLE[3], [0, 1, 0]::DOUBLE[3])) v(a, b);
+
+statement error
+SELECT array_cross_product(a, b) FROM null_vectors;
+----
+Invalid Input Error: array_cross_product: left argument can not contain NULL values
+
+# lambda functions are only fallible if their lambda is
+query I
+SELECT invoke(lambda x: x + 1, i) FROM range(3) t(i) ORDER BY ALL;
+----
+1
+2
+3
+
+statement error
+SELECT invoke(lambda x: 10 // x, i) FROM range(3) t(i);
+----
+Invalid Input Error: Division by zero
+
+statement error
+SELECT invoke(lambda x: x::INTEGER, s) FROM (VALUES ('abc')) v(s);
+----
+Conversion Error: Could not convert string
+
+statement ok
+CREATE TABLE lambda_lists AS SELECT * FROM (VALUES ([1, 2, 3]::TINYINT[]), ([-127, 5]::TINYINT[]), ([]::TINYINT[])) v(l);
+
+query III
+SELECT list_transform(l, lambda x: x + 1), list_filter(l, lambda x: x > 1), list_reduce(l, lambda acc, x: acc + x, 0) FROM lambda_lists ORDER BY ALL;
+----
+[]	[]	0
+[-126, 6]	[5]	-122
+[2, 3, 4]	[2, 3]	6
+
+statement ok
+CREATE TABLE throwing_lists AS SELECT * FROM (VALUES ([1, 2, 3]::TINYINT[]), ([-128, 5]::TINYINT[])) v(l);
+
+statement error
+SELECT list_transform(l, lambda x: abs(x)) FROM throwing_lists;
+----
+Out of Range Error: Overflow on abs(-128)
+
+statement error
+SELECT list_filter(l, lambda x: abs(x) > 1) FROM throwing_lists;
+----
+Out of Range Error: Overflow on abs(-128)
+
+statement error
+SELECT list_reduce(l, lambda acc, x: abs(acc) + x) FROM throwing_lists;
+----
+Out of Range Error: Overflow on abs(-128)
+
+statement error
+SELECT list_reduce(l, lambda acc, x: acc + x) FROM lambda_lists;
+----
+Parameter Not Allowed Error: Cannot perform list_reduce on an empty input list

@@ -8,17 +8,59 @@
 
 namespace duckdb {
 
+//! Whether the difference in the part between two finite timestamps can be computed with the Gregorian calendar
+//! without failing. Differences in microseconds up to minutes are computed from the microseconds, which can overflow,
+//! and hours are counted by the calendar in an int32, which can also overflow.
+static bool CannotErrorWithGregorian(DatePartSpecifier part) {
+	switch (part) {
+	case DatePartSpecifier::MILLENNIUM:
+	case DatePartSpecifier::CENTURY:
+	case DatePartSpecifier::DECADE:
+	case DatePartSpecifier::YEAR:
+	case DatePartSpecifier::QUARTER:
+	case DatePartSpecifier::MONTH:
+	case DatePartSpecifier::WEEK:
+	case DatePartSpecifier::YEARWEEK:
+	case DatePartSpecifier::ISOYEAR:
+	case DatePartSpecifier::DAY:
+	case DatePartSpecifier::DOW:
+	case DatePartSpecifier::ISODOW:
+	case DatePartSpecifier::DOY:
+	case DatePartSpecifier::JULIAN_DAY:
+	case DatePartSpecifier::ERA:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool TryGetConstantPart(BindScalarFunctionInput &input, DatePartSpecifier &part) {
+	auto part_value = input.TryGetConstant(0);
+	if (!part_value || part_value->IsNull()) {
+		return false;
+	}
+	return TryGetDatePartSpecifier(part_value->GetValue<string>(), part);
+}
+
+//! Binds the calendar, and marks the function as unable to throw if the part is constant and cannot fail.
+//! A part that is not constant is parsed during execution, where an unrecognized part throws.
+static unique_ptr<FunctionData> BindCalendarDifference(BindScalarFunctionInput &input) {
+	auto result = ICUDateFunc::Bind(input);
+	DatePartSpecifier part;
+	if (TryGetConstantPart(input, part) && CannotErrorWithGregorian(part)) {
+		ICUDateFunc::SetCannotErrorIfGregorian(input.GetBoundFunction(), result->Cast<ICUDateFunc::BindData>());
+	}
+	return result;
+}
+
 struct ICUCalendarSub : public ICUDateFunc {
 	static unique_ptr<FunctionData> Bind(BindScalarFunctionInput &input) {
-		auto part_value = input.TryGetConstant(0);
-		if (part_value && !part_value->IsNull()) {
-			DatePartSpecifier part;
-			if (TryGetDatePartSpecifier(part_value->GetValue<string>(), part) && part == DatePartSpecifier::ERA) {
-				// date_sub is not monotone for eras because era boundaries can occur partway through a year
-				input.GetBoundFunction().SetArgProperties({});
-			}
+		DatePartSpecifier part;
+		if (TryGetConstantPart(input, part) && part == DatePartSpecifier::ERA) {
+			// date_sub is not monotone for eras because era boundaries can occur partway through a year
+			input.GetBoundFunction().SetArgProperties({});
 		}
-		return ICUDateFunc::Bind(input);
+		return BindCalendarDifference(input);
 	}
 
 	//	ICU only has 32 bit precision for date parts, so it can overflow a high resolution.
@@ -155,7 +197,8 @@ struct ICUCalendarSub : public ICUDateFunc {
 	static void AddFunctions(const Identifier &name, ExtensionLoader &loader) {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetFunction<timestamp_tz_t>(LogicalType::TIMESTAMP_TZ));
-		// throws for unrecognized part specifiers and for dates that overflow the timestamp range
+		// throws for unrecognized part specifiers and for differences that overflow, and non-Gregorian calendars can
+		// fail for extreme timestamps - cleared in the bind for constant parts that cannot fail
 		set.SetFallible();
 		set.SetArgProperties(1, ArgProperties().NonIncreasing());
 		set.SetArgProperties(2, ArgProperties().NonDecreasing());
@@ -313,7 +356,7 @@ struct ICUCalendarDiff : public ICUDateFunc {
 
 	template <typename TA>
 	static ScalarFunction GetFunction(const LogicalTypeId &type) {
-		ScalarFunction fun({}, LogicalType::BIGINT, ICUDateDiffFunction<TA>, Bind);
+		ScalarFunction fun({}, LogicalType::BIGINT, ICUDateDiffFunction<TA>, BindCalendarDifference);
 		fun.GetSignature()
 		    .AddParameter("part", LogicalType::VARCHAR)
 		    .AddParameter("startdate", type)
@@ -325,7 +368,8 @@ struct ICUCalendarDiff : public ICUDateFunc {
 		ScalarFunctionSet set {name};
 		set.AddFunction(GetFunction<timestamp_tz_t>(LogicalType::TIMESTAMP_TZ));
 		set.AddFunction(GetFunction<timestamp_tz_ns_t>(LogicalType::TIMESTAMP_TZ_NS));
-		// throws for unrecognized part specifiers and for dates that overflow the timestamp range
+		// throws for unrecognized part specifiers and for differences that overflow, and non-Gregorian calendars can
+		// fail for extreme timestamps - cleared in the bind for constant parts that cannot fail
 		set.SetFallible();
 		set.SetArgProperties(1, ArgProperties().NonIncreasing());
 		set.SetArgProperties(2, ArgProperties().NonDecreasing());

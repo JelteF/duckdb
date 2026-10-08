@@ -1,0 +1,128 @@
+# name: test/sql/json/test_json_fallibility.test
+# description: JSON functions that cannot throw for JSON input with constant paths, and the cases that still can
+# group: [json]
+
+require json
+
+statement ok
+CREATE TABLE t AS SELECT
+	'{"a":1,"b":[1,2,3],"c":{"d":"x"}}'::JSON AS j,
+	'$[*.duck' AS bad_path,
+	'$.b[*]' AS wildcard_path,
+	NULL::VARCHAR AS null_key,
+	1 AS i;
+
+# constant paths are validated in the bind, so reading JSON input cannot fail
+
+query IIIIIII
+SELECT json_extract(j, '$.a'), json_extract_string(j, '$.c.d'), json_value(j, '$.a'), json_type(j, '$.b'),
+	json_exists(j, '$.z'), json_array_length(j, '$.b'), json_keys(j, '$.c')
+FROM t;
+----
+1	x	1	ARRAY	false	3	[d]
+
+query I
+SELECT json_extract(j, '$.b[*]') FROM t;
+----
+[1, 2, 3]
+
+query IIIIIII
+SELECT json_extract(j, ['$.a', '$.b[0]']), json_extract_string(j, ['$.c.d']), json_value(j, ['$.a', '$.b']),
+	json_type(j, ['$.a', '$.b']), json_exists(j, ['$.a', '$.z']), json_array_length(j, ['$.b', '$.a']),
+	json_keys(j, ['$.c'])
+FROM t;
+----
+[1, 1]	[x]	[1, NULL]	[UBIGINT, ARRAY]	[true, false]	[3, 0]	[[d]]
+
+# a path that is not constant is only parsed during execution
+
+statement error
+SELECT json_extract(j, bad_path) FROM t;
+----
+Invalid Input Error: JSON path error
+
+statement error
+SELECT json_exists(j, bad_path) FROM t;
+----
+Invalid Input Error: JSON path error
+
+statement error
+SELECT json_extract(j, wildcard_path) FROM t;
+----
+Invalid Input Error: JSON path cannot contain wildcards
+
+# json_object only throws for NULL keys
+
+query I
+SELECT json_object('k', i) FROM t;
+----
+{"k":1}
+
+statement error
+SELECT json_object(null_key, i) FROM t;
+----
+Invalid Input Error: JSON key cannot be NULL
+
+statement error
+SELECT json_object(NULL::VARCHAR, i) FROM t;
+----
+Invalid Input Error: JSON key cannot be NULL
+
+# the modification functions only throw for invalid paths
+
+statement ok
+CREATE TABLE m AS SELECT '{"a":1,"b":2}'::JSON AS j, '$not_a_path' AS bad_path;
+
+query IIIII
+SELECT json_set(j, '$.c', '3'), json_insert(j, '$.a', '3'), json_replace(j, '$.a', '3'), json_remove(j, '$.a'),
+	json_remove(j, '/a')
+FROM m;
+----
+{"a":1,"b":2,"c":3}	{"a":1,"b":2}	{"a":3,"b":2}	{"b":2}	{"b":2}
+
+statement error
+SELECT json_insert(j, '$not_a_path', '3') FROM m;
+----
+Invalid Input Error: JSON path error
+
+statement error
+SELECT json_remove(j, bad_path) FROM m;
+----
+Invalid Input Error: JSON path error
+
+# functions on JSON input that cannot fail
+
+statement ok
+CREATE TABLE p AS SELECT '{"a":1}'::JSON AS x, '{"b":2}'::JSON AS y;
+
+query II
+SELECT json_deep_merge(x, y), json_merge_patch_diff(x, y) FROM p;
+----
+{"a":1,"b":2}	{"a":null,"b":2}
+
+statement ok
+CREATE TABLE g AS SELECT 'POINT(1 2)'::GEOMETRY AS geom;
+
+query I
+SELECT st_asgeojson(geom) FROM g;
+----
+{"type":"Point","coordinates":[1.0,2.0]}
+
+# non-strict transformation of JSON input turns values that cannot be transformed into NULL
+
+statement ok
+CREATE TABLE tr AS SELECT * FROM (VALUES ('{"a":1}'::JSON), ('[]'::JSON), ('{"a":"x"}'::JSON)) v(j);
+
+query I
+SELECT json_transform(j, '{"a":"INTEGER"}') FROM tr ORDER BY j::VARCHAR;
+----
+{'a': NULL}
+{'a': NULL}
+{'a': 1}
+
+# VARCHAR input still has to be parsed
+
+statement error
+SELECT json_transform(j::VARCHAR || 'x', '{"a":"INTEGER"}') FROM tr;
+----
+Invalid Input Error: Malformed JSON

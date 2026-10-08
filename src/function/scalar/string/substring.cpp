@@ -321,15 +321,23 @@ void PropagateStrictFunctionValidity(BaseStatistics &result, const vector<BaseSt
 }
 
 unique_ptr<FunctionData> SubstringBind(BindScalarFunctionInput &input) {
+	optional<Value> length;
+	if (input.GetArguments().size() == 3) {
+		length = input.TryGetConstant(2);
+	}
 	auto offset = input.TryGetConstant(1);
-	if (!offset || offset->IsNull()) {
+	if ((offset && offset->IsNull()) || (length && length->IsNull())) {
+		// the result is always NULL
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+		return nullptr;
+	}
+	if (!offset) {
 		return nullptr;
 	}
 	auto offset_value = offset->DefaultCastAs(LogicalType::BIGINT).GetValue<int64_t>();
 	int64_t length_value = NumericLimits<uint32_t>::Maximum();
 	if (input.GetArguments().size() == 3) {
-		auto length = input.TryGetConstant(2);
-		if (!length || length->IsNull()) {
+		if (!length) {
 			return nullptr;
 		}
 		length_value = length->DefaultCastAs(LogicalType::BIGINT).GetValue<int64_t>();

@@ -1,0 +1,16 @@
+# name: test/sql/function/list/lambdas/volatile_lambda_serialization.test
+# description: A lambda function with a volatile lambda stays volatile after (de)serializing the plan
+# group: [lambdas]
+
+statement ok
+SET debug_verify_serializer = true
+
+query II
+SELECT count(DISTINCT list_transform([1], lambda x: x + random())[1]), count(DISTINCT list_filter(range(100), lambda x: random() < 0.5)) > 1 FROM range(100)
+----
+100	true
+
+query I
+SELECT count(DISTINCT list_reduce([1, 2], lambda acc, x: acc + x + random())) FROM range(100)
+----
+100
