@@ -224,10 +224,13 @@ static void ExecuteExpression(const idx_t elem_cnt, const LambdaFunctions::Colum
 // ListLambdaBindData
 //===--------------------------------------------------------------------===//
 
-//! The function executes the lambda itself, so it inherits the lambda's volatility
+//! The function executes the lambda itself, so it inherits the lambda's volatility and fallibility
 static void PropagateLambdaProperties(BoundScalarFunction &function, const Expression &lambda_expr) {
 	if (lambda_expr.IsVolatile()) {
 		function.SetVolatile();
+	}
+	if (lambda_expr.CanThrow()) {
+		function.SetFallible();
 	}
 }
 

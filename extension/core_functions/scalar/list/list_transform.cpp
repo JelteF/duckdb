@@ -41,8 +41,7 @@ ScalarFunction ListTransformFun::GetFunction() {
 	fun.SetSerializeCallback(ListLambdaBindData::Serialize);
 	fun.SetDeserializeCallback(ListLambdaBindData::Deserialize);
 	fun.SetBindLambdaCallback(ListTransformBindLambda);
-	// the lambda expression that is executed for every element can throw
-	fun.SetFallible();
+	// fallible only if the lambda can throw, which is decided in the bind (and on deserialization)
 
 	return fun;
 }
