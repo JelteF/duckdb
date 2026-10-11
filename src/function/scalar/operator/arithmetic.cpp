@@ -399,8 +399,10 @@ void DecimalAddSubtractResolveTypes(ResolveScalarFunctionTypesInput &input) {
 	auto &result_type = bound_function.GetReturnType();
 	if (check_overflow) {
 		bound_function.SetFunctionCallback(GetScalarBinaryFunction<OPOVERFLOWCHECK>(result_type.InternalType()));
+		bound_function.SetFallible();
 	} else {
 		bound_function.SetFunctionCallback(GetScalarBinaryFunction<OP>(result_type.InternalType()));
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	}
 	if (IS_SUBTRACT) {
 		bound_function.SetStatisticsCallback(
@@ -427,8 +429,10 @@ unique_ptr<FunctionData> DeserializeDecimalArithmetic(Deserializer &deserializer
 	auto arguments = deserializer.ReadProperty<vector<LogicalType>>(102, "arguments");
 	if (check_overflow) {
 		bound_function.SetFunctionCallback(GetScalarBinaryFunction<OPOVERFLOWCHECK>(return_type.InternalType()));
+		bound_function.SetFallible();
 	} else {
 		bound_function.SetFunctionCallback(GetScalarBinaryFunction<OP>(return_type.InternalType()));
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	}
 	bound_function.SetStatisticsCallback(nullptr); // TODO we likely dont want to do stats prop again
 	bound_function.SetReturnType(return_type);
@@ -512,7 +516,6 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 		} else if (left_type.IsFloating()) {
 			ScalarFunction function("+", {left_type, right_type}, left_type,
 			                        GetScalarBinaryFunction<AddOperator>(left_type.InternalType()));
-			function.SetFallible();
 			function.SetArgProperties({inc, inc});
 			function.SetStatisticsCallback(PropagateFloatingStats<AddPropagateStatistics, AddOperator>);
 			return function;
@@ -590,13 +593,11 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 			// TIME +/- INTERVAL wraps modulo 24h.
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIME,
 			                        ScalarFunction::BinaryFunction<interval_t, dtime_t, dtime_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		} else if (right_type.id() == LogicalTypeId::TIME_TZ) {
 			ScalarFunction function(
 			    "+", {left_type, right_type}, LogicalType::TIME_TZ,
 			    ScalarFunction::BinaryFunction<interval_t, dtime_tz_t, dtime_tz_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		} else if (right_type.id() == LogicalTypeId::TIMESTAMP) {
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIMESTAMP,
@@ -610,7 +611,6 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 		if (right_type.id() == LogicalTypeId::INTERVAL) {
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIME,
 			                        ScalarFunction::BinaryFunction<dtime_t, interval_t, dtime_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		} else if (right_type.id() == LogicalTypeId::DATE) {
 			ScalarFunction function("+", {left_type, right_type}, LogicalType::TIMESTAMP,
@@ -629,7 +629,6 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 			ScalarFunction function(
 			    "+", {left_type, right_type}, LogicalType::TIME_TZ,
 			    ScalarFunction::BinaryFunction<dtime_tz_t, interval_t, dtime_tz_t, AddTimeOperator>);
-			function.SetFallible();
 			return function;
 		}
 		break;
@@ -803,7 +802,9 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &type) {
 		D_ASSERT(type.IsNumeric());
 		ScalarFunction func("-", {type}, type, ScalarFunction::GetScalarUnaryFunction<NegateOperator>(type));
 		func.SetResolveTypesCallback(IntegerNegateResolveTypes);
-		func.SetFallible();
+		if (!type.IsFloating()) {
+			func.SetFallible();
+		}
 		func.SetUnaryArgProperties(ArgProperties().StrictlyDecreasing());
 		return func;
 	}
@@ -833,7 +834,6 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &left_type, const
 		} else if (left_type.IsFloating()) {
 			ScalarFunction function("-", {left_type, right_type}, left_type,
 			                        GetScalarBinaryFunction<SubtractOperator>(left_type.InternalType()));
-			function.SetFallible();
 			function.SetArgProperties({ArgProperties().StrictlyIncreasing(), ArgProperties().StrictlyDecreasing()});
 			function.SetStatisticsCallback(PropagateFloatingStats<SubtractPropagateStatistics, SubtractOperator>);
 			return function;
@@ -849,6 +849,7 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &left_type, const
 	switch (left_type.id()) {
 	case LogicalTypeId::BIGNUM: {
 		ScalarFunction function("-", {left_type, right_type}, left_type, BignumSubtract);
+		function.SetFallible();
 		function.SetArgProperties({ArgProperties().StrictlyIncreasing(), ArgProperties().StrictlyDecreasing()});
 		return function;
 	}
@@ -908,7 +909,6 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &left_type, const
 		if (right_type.id() == LogicalTypeId::INTERVAL) {
 			ScalarFunction function("-", {left_type, right_type}, LogicalType::TIME,
 			                        ScalarFunction::BinaryFunction<dtime_t, interval_t, dtime_t, SubtractTimeOperator>);
-			function.SetFallible();
 			// TIME - INTERVAL wraps modulo 24h (e.g. 04:00 - INTERVAL '5 hours' = 23:00), so monotonicity
 			// in either argument does not hold.
 			return function;
@@ -919,7 +919,6 @@ ScalarFunction SubtractFunction::GetFunction(const LogicalType &left_type, const
 			ScalarFunction function(
 			    "-", {left_type, right_type}, LogicalType::TIME_TZ,
 			    ScalarFunction::BinaryFunction<dtime_tz_t, interval_t, dtime_tz_t, SubtractTimeOperator>);
-			function.SetFallible();
 			// TIME_TZ - INTERVAL wraps modulo 24h, same reasoning as TIME above.
 			return function;
 		}
@@ -1070,8 +1069,10 @@ void DecimalMultiplyResolveTypes(ResolveScalarFunctionTypesInput &input) {
 	if (check_overflow) {
 		bound_function.SetFunctionCallback(
 		    GetScalarBinaryFunction<DecimalMultiplyOverflowCheck>(result_type.InternalType()));
+		bound_function.SetFallible();
 	} else {
 		bound_function.SetFunctionCallback(GetScalarBinaryFunction<MultiplyOperator>(result_type.InternalType()));
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	}
 	bound_function.SetStatisticsCallback(
 	    PropagateNumericStats<TryDecimalMultiply, MultiplyPropagateStatistics, MultiplyOperator>);
@@ -1097,9 +1098,11 @@ ScalarFunctionSet OperatorMultiplyFun::GetFunctions() {
 			    DeserializeDecimalArithmetic<MultiplyOperator, DecimalMultiplyOverflowCheck>);
 			multiply.AddFunction(function);
 		} else if (TypeIsIntegral(type.InternalType())) {
-			multiply.AddFunction(ScalarFunction(
+			ScalarFunction function(
 			    {type, type}, type, GetScalarIntegerFunction<MultiplyOperatorOverflowCheck>(type.InternalType()),
-			    nullptr, PropagateNumericStats<TryMultiplyOperator, MultiplyPropagateStatistics, MultiplyOperator>));
+			    nullptr, PropagateNumericStats<TryMultiplyOperator, MultiplyPropagateStatistics, MultiplyOperator>);
+			function.SetFallible();
+			multiply.AddFunction(function);
 		} else if (type.IsFloating()) {
 			multiply.AddFunction(ScalarFunction({type, type}, type,
 			                                    GetScalarBinaryFunction<MultiplyOperator>(type.InternalType()), nullptr,
@@ -1109,19 +1112,19 @@ ScalarFunctionSet OperatorMultiplyFun::GetFunctions() {
 			    ScalarFunction({type, type}, type, GetScalarBinaryFunction<MultiplyOperator>(type.InternalType())));
 		}
 	}
-	multiply.AddFunction(
+	ScalarFunction interval_functions[] = {
 	    ScalarFunction({LogicalType::INTERVAL, LogicalType::DOUBLE}, LogicalType::INTERVAL,
-	                   ScalarFunction::BinaryFunction<interval_t, double, interval_t, MultiplyOperator>));
-	multiply.AddFunction(
+	                   ScalarFunction::BinaryFunction<interval_t, double, interval_t, MultiplyOperator>),
 	    ScalarFunction({LogicalType::DOUBLE, LogicalType::INTERVAL}, LogicalType::INTERVAL,
-	                   ScalarFunction::BinaryFunction<double, interval_t, interval_t, MultiplyOperator>));
-	multiply.AddFunction(
+	                   ScalarFunction::BinaryFunction<double, interval_t, interval_t, MultiplyOperator>),
 	    ScalarFunction({LogicalType::BIGINT, LogicalType::INTERVAL}, LogicalType::INTERVAL,
-	                   ScalarFunction::BinaryFunction<int64_t, interval_t, interval_t, MultiplyOperator>));
-	multiply.AddFunction(
+	                   ScalarFunction::BinaryFunction<int64_t, interval_t, interval_t, MultiplyOperator>),
 	    ScalarFunction({LogicalType::INTERVAL, LogicalType::BIGINT}, LogicalType::INTERVAL,
-	                   ScalarFunction::BinaryFunction<interval_t, int64_t, interval_t, MultiplyOperator>));
-	multiply.SetFallible();
+	                   ScalarFunction::BinaryFunction<interval_t, int64_t, interval_t, MultiplyOperator>)};
+	for (auto &function : interval_functions) {
+		function.SetFallible();
+		multiply.AddFunction(function);
+	}
 
 	multiply.ApplyToFunctions(NameOperatorParameters);
 	return multiply;
@@ -1280,6 +1283,31 @@ scalar_function_t GetBinaryFunctionZeroCheck(PhysicalType type, bool null_on_zer
 	return GetBinaryFunctionZeroCheck<OP, false>(type);
 }
 
+//! Must match the wrappers chosen by GetBinaryFunctionZeroCheck: only BinaryZeroCheckWrapper never throws when
+//! division by zero returns NULL, the others still throw on MIN / -1. Decimals use the signed wrappers too, but can
+//! never hold the minimum value of their storage type.
+void SetZeroCheckErrorMode(BoundScalarFunction &bound_function, bool null_on_zero) {
+	auto &return_type = bound_function.GetReturnType();
+	bool can_overflow;
+	switch (return_type.InternalType()) {
+	case PhysicalType::INT8:
+	case PhysicalType::INT16:
+	case PhysicalType::INT32:
+	case PhysicalType::INT64:
+	case PhysicalType::INT128:
+		can_overflow = return_type.id() != LogicalTypeId::DECIMAL;
+		break;
+	default:
+		can_overflow = false;
+		break;
+	}
+	if (can_overflow || !null_on_zero) {
+		bound_function.SetFallible();
+	} else {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+}
+
 template <class OP>
 unique_ptr<FunctionData> BindDivisionByZero(BindScalarFunctionInput &input) {
 	auto &context = input.GetClientContext();
@@ -1287,6 +1315,7 @@ unique_ptr<FunctionData> BindDivisionByZero(BindScalarFunctionInput &input) {
 	auto null_on_zero = !Settings::Get<ErrorOnDivisionByZeroSetting>(context);
 	bound_function.SetFunctionCallback(
 	    GetBinaryFunctionZeroCheck<OP>(bound_function.GetReturnType().InternalType(), null_on_zero));
+	SetZeroCheckErrorMode(bound_function, null_on_zero);
 	return nullptr;
 }
 
@@ -1310,10 +1339,12 @@ unique_ptr<FunctionData> BindBinaryFloatingPoint(BindScalarFunctionInput &input)
 
 	if (Settings::Get<IeeeFloatingPointOpsSetting>(context)) {
 		bound_function.SetFunctionCallback(GetScalarBinaryFunction<OP>(bound_function.GetReturnType().InternalType()));
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	} else {
 		auto null_on_zero = !Settings::Get<ErrorOnDivisionByZeroSetting>(context);
 		bound_function.SetFunctionCallback(
 		    GetBinaryFunctionZeroCheck<OP>(bound_function.GetReturnType().InternalType(), null_on_zero));
+		SetZeroCheckErrorMode(bound_function, null_on_zero);
 	}
 	return nullptr;
 }
@@ -1416,6 +1447,7 @@ static void DecimalModuloResolveTypes(ResolveScalarFunctionTypesInput &input) {
 	auto &result_type = bound_function.GetReturnType();
 	auto null_on_zero = !Settings::Get<ErrorOnDivisionByZeroSetting>(input.GetClientContext());
 	bound_function.SetFunctionCallback(GetBinaryFunctionZeroCheck<OP>(result_type.InternalType(), null_on_zero));
+	SetZeroCheckErrorMode(bound_function, null_on_zero);
 }
 
 template <>

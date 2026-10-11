@@ -138,7 +138,6 @@ ScalarFunctionSet JSONFunctions::GetMergePatchDiffFunction() {
 	                   JSONFunctionLocalState::Init);
 	fun.GetSignature().AddParameter("old", LogicalType::JSON()).AddParameter("new", LogicalType::JSON());
 	fun.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
-	fun.SetFallible();
 
 	return ScalarFunctionSet(fun);
 }

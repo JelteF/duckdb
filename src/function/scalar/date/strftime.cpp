@@ -42,6 +42,28 @@ struct StrfTimeBindData : public FunctionData {
 	}
 };
 
+//! Week based specifiers compute January 1st of the year (of the date or the year before), which does not exist for
+//! dates in the first year of the DATE range.
+//! TIMESTAMP values close to the minimum cannot be split into a date and time, regardless of the format.
+//! TIMESTAMP_NS has a much smaller range, so it is not affected by either.
+static bool StrfTimeCanThrow(const LogicalType &data_type, const StrfTimeFormat &format, bool is_null) {
+	if (is_null) {
+		return false;
+	}
+	switch (data_type.id()) {
+	case LogicalTypeId::DATE:
+		return format.HasFormatSpecifier(StrTimeSpecifier::YEAR_ISO) ||
+		       format.HasFormatSpecifier(StrTimeSpecifier::WEEK_NUMBER_ISO) ||
+		       format.HasFormatSpecifier(StrTimeSpecifier::WEEK_NUMBER_PADDED_SUN_FIRST) ||
+		       format.HasFormatSpecifier(StrTimeSpecifier::WEEK_NUMBER_PADDED_MON_FIRST);
+	case LogicalTypeId::TIMESTAMP_NS:
+	case LogicalTypeId::TIMESTAMP_TZ_NS:
+		return false;
+	default:
+		return true;
+	}
+}
+
 template <bool REVERSED>
 static unique_ptr<FunctionData> StrfTimeBindFunction(BindScalarFunctionInput &input) {
 	auto &arguments = input.GetArguments();
@@ -56,6 +78,9 @@ static unique_ptr<FunctionData> StrfTimeBindFunction(BindScalarFunctionInput &in
 		if (!error.empty()) {
 			throw InvalidInputException(*format_arg, "Failed to parse format specifier %s: %s", format_string, error);
 		}
+	}
+	if (!StrfTimeCanThrow(input.GetBoundFunction().GetArguments()[REVERSED ? 1 : 0], format, is_null)) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	}
 	return make_uniq<StrfTimeBindData>(format, format_string, is_null);
 }
@@ -335,7 +360,7 @@ ScalarFunctionSet StrfTimeFun::GetFunctions() {
 	    .AddParameter("data", LogicalType::TIMESTAMP_TZ_NS);
 	strftime.AddFunction(ts_tz_ns_format_data);
 
-	// throws for unsupported format specifiers
+	// the bind clears this for formats and input types that cannot throw
 	strftime.SetFallible();
 	return strftime;
 }

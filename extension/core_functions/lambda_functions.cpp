@@ -224,6 +224,16 @@ static void ExecuteExpression(const idx_t elem_cnt, const LambdaFunctions::Colum
 // ListLambdaBindData
 //===--------------------------------------------------------------------===//
 
+//! The function executes the lambda itself, so it inherits the lambda's volatility and fallibility
+static void PropagateLambdaProperties(BoundScalarFunction &function, const Expression &lambda_expr) {
+	if (lambda_expr.IsVolatile()) {
+		function.SetVolatile();
+	}
+	if (lambda_expr.CanThrow()) {
+		function.SetFallible();
+	}
+}
+
 void ListLambdaBindData::Serialize(Serializer &serializer, const optional_ptr<FunctionData> bind_data_p,
                                    const BoundScalarFunction &) {
 	auto &bind_data = bind_data_p->Cast<ListLambdaBindData>();
@@ -233,12 +243,16 @@ void ListLambdaBindData::Serialize(Serializer &serializer, const optional_ptr<Fu
 	serializer.WritePropertyWithDefault<bool>(103, "has_initial", bind_data.has_initial, false);
 }
 
-unique_ptr<FunctionData> ListLambdaBindData::Deserialize(Deserializer &deserializer, BoundScalarFunction &) {
+unique_ptr<FunctionData> ListLambdaBindData::Deserialize(Deserializer &deserializer, BoundScalarFunction &function) {
 	auto return_type = deserializer.ReadProperty<LogicalType>(100, "return_type");
 	auto lambda_expr = deserializer.ReadPropertyWithExplicitDefault<unique_ptr<Expression>>(101, "lambda_expr",
 	                                                                                        unique_ptr<Expression>());
 	auto has_index = deserializer.ReadProperty<bool>(102, "has_index");
 	auto has_initial = deserializer.ReadPropertyWithExplicitDefault<bool>(103, "has_initial", false);
+	// the bind is not re-run on deserialization, so restore the properties it derived from the lambda
+	if (lambda_expr) {
+		PropagateLambdaProperties(function, *lambda_expr);
+	}
 	return make_uniq<ListLambdaBindData>(return_type, std::move(lambda_expr), has_index, has_initial);
 }
 
@@ -396,9 +410,7 @@ unique_ptr<FunctionData> LambdaFunctions::ListLambdaBind(ClientContext &context,
 	// bound lambda expression stays intact as a child of the function
 	auto &bound_lambda_expr = arguments[1]->Cast<BoundLambdaExpression>();
 	auto lambda_expr = bound_lambda_expr.LambdaExpr()->Copy();
-	if (lambda_expr->IsVolatile()) {
-		bound_function.SetVolatile();
-	}
+	PropagateLambdaProperties(bound_function, *lambda_expr);
 
 	return make_uniq<ListLambdaBindData>(bound_function.GetReturnType(), std::move(lambda_expr), has_index);
 }

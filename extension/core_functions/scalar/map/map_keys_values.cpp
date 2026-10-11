@@ -64,8 +64,6 @@ ScalarFunction MapKeysFun::GetFunction() {
 	ScalarFunction function({}, LogicalType::LIST(key_type), MapKeysFunction);
 	function.GetSignature().AddParameter("map", LogicalType::MAP(key_type, val_type));
 	function.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
-
-	function.SetFallible();
 	return function;
 }
 
@@ -77,8 +75,6 @@ ScalarFunction MapValuesFun::GetFunction() {
 	function.GetSignature().AddParameter("map", LogicalType::MAP(key_type, val_type));
 	function.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
 	function.SetStatisticsCallback(MapValuesStats);
-
-	function.SetFallible();
 	return function;
 }
 

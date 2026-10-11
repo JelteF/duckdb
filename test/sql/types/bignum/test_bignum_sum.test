@@ -289,6 +289,16 @@ select bignum + '1'::bignum from test_all_types(use_large_bignum = true) limit 1
 ----
 Out of Range Error: Overflow in Bignum Operation. A Bignum can hold max 8388607 data bytes. Current bignum has 8388608 bytes.
 
+statement error
+select bignum - '1'::bignum from test_all_types(use_large_bignum = true) limit 1
+----
+Out of Range Error: Underflow in Bignum Operation. A Bignum can hold max 8388607 data bytes. Current bignum has 8388608 bytes.
+
+statement error
+select bignum - '-1'::bignum from test_all_types(use_large_bignum = true) limit 1 offset 1
+----
+Out of Range Error: Overflow in Bignum Operation. A Bignum can hold max 8388607 data bytes. Current bignum has 8388608 bytes.
+
 
 statement ok
 create table bignum_underflow as select bignum from test_all_types(use_large_bignum = true) limit 1

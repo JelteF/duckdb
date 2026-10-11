@@ -191,3 +191,12 @@ statement error
 select json_structure(repeat('{"a":', 200) || '1' || repeat('}', 200));
 ----
 <REGEX>:.*maximum recursion depth.*
+
+# valid JSON can also be nested too deeply
+statement ok
+CREATE TABLE deep AS SELECT (repeat('[', 200) || repeat(']', 200))::JSON AS j;
+
+statement error
+SELECT json_structure(j) FROM deep;
+----
+Invalid Input Error: JSON exceeds maximum recursion depth

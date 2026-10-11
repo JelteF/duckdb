@@ -232,6 +232,21 @@ static auto ArrayGenericFoldStats(ClientContext &context, FunctionStatisticsInpu
 	return new_stats.ToUnique();
 }
 
+static auto ArrayFixedCombineStats(ClientContext &context, FunctionStatisticsInput &input)
+    -> unique_ptr<BaseStatistics> {
+	const auto &lhs_stats = input.child_stats[0];
+	const auto &rhs_stats = input.child_stats[1];
+	if (lhs_stats.GetStatsType() != StatisticsType::ARRAY_STATS ||
+	    rhs_stats.GetStatsType() != StatisticsType::ARRAY_STATS) {
+		return nullptr;
+	}
+	// NULL elements are the only reason the combine throws
+	if (!ArrayStats::GetChildStats(lhs_stats).CanHaveNull() && !ArrayStats::GetChildStats(rhs_stats).CanHaveNull()) {
+		input.expr.FunctionMutable().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+	return nullptr;
+}
+
 //------------------------------------------------------------------------------
 // Function Registration
 //------------------------------------------------------------------------------
@@ -309,14 +324,17 @@ ScalarFunctionSet ArrayCrossProductFun::GetFunctions() {
 	auto float_array = LogicalType::ARRAY(LogicalType::FLOAT, 3);
 	auto double_array = LogicalType::ARRAY(LogicalType::DOUBLE, 3);
 
-	ScalarFunction float_fun({}, float_array, ArrayFixedCombine<float, CrossProductOp, 3>);
+	ScalarFunction float_fun({}, float_array, ArrayFixedCombine<float, CrossProductOp, 3>, nullptr,
+	                         ArrayFixedCombineStats);
 	float_fun.GetSignature().AddParameter("array1", float_array).AddParameter("array2", float_array);
 	set.AddFunction(float_fun);
 
-	ScalarFunction double_fun({}, double_array, ArrayFixedCombine<double, CrossProductOp, 3>);
+	ScalarFunction double_fun({}, double_array, ArrayFixedCombine<double, CrossProductOp, 3>, nullptr,
+	                          ArrayFixedCombineStats);
 	double_fun.GetSignature().AddParameter("array1", double_array).AddParameter("array2", double_array);
 	set.AddFunction(double_fun);
 
+	// throws on NULL elements, cleared by the statistics callback if there are none
 	set.SetFallible();
 
 	return set;

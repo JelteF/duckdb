@@ -160,7 +160,6 @@ static void MapFunction(DataChunk &args, ExpressionState &, Vector &result) {
 
 ScalarFunctionSet MapFun::GetFunctions() {
 	ScalarFunction empty_func({}, LogicalType::MAP(LogicalType::SQLNULL, LogicalType::SQLNULL), MapFunction);
-	empty_func.SetFallible();
 
 	auto key_type = LogicalType::TEMPLATE("K");
 	auto val_type = LogicalType::TEMPLATE("V");

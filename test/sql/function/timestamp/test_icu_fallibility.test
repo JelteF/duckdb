@@ -1,0 +1,125 @@
+# name: test/sql/function/timestamp/test_icu_fallibility.test
+# description: ICU date functions that cannot throw with the Gregorian calendar, and the cases that still can
+# group: [timestamp]
+
+require icu
+
+statement ok
+SET TimeZone = 'UTC';
+
+statement ok
+SET Calendar = 'gregorian';
+
+statement ok
+CREATE TABLE ts AS SELECT * FROM (VALUES
+	('2000-01-01 00:00:00+00'::TIMESTAMPTZ, '2024-03-15 12:00:00+00'::TIMESTAMPTZ, 'yearz')
+) t(a, b, bad_part);
+
+statement ok
+CREATE TABLE extremes AS SELECT * FROM (VALUES
+	('290309-12-22 (BC) 00:00:00+00'::TIMESTAMPTZ),
+	('294247-01-10 04:00:54.775806+00'::TIMESTAMPTZ)
+) t(ts);
+
+# date parts cannot fail with the Gregorian calendar, even for the extremes
+
+query IIIIII
+SELECT year(b), month(b), day(b), hour(b), date_part('year', b), date_part('month', b) FROM ts;
+----
+2024	3	15	12	2024	3
+
+query I
+SELECT date_part(['year', 'month', 'day'], b) FROM ts;
+----
+{'year': 2024, 'month': 3, 'day': 15}
+
+query III
+SELECT monthname(b), dayname(b), last_day(b) FROM ts;
+----
+March	Friday	2024-03-31
+
+statement ok
+SELECT era(ts), year(ts), month(ts), day(ts), decade(ts), century(ts), millennium(ts), microsecond(ts),
+	millisecond(ts), second(ts), minute(ts), hour(ts), dayofweek(ts), isodow(ts), week(ts), dayofyear(ts),
+	quarter(ts), isoyear(ts), timezone(ts), timezone_hour(ts), timezone_minute(ts), epoch(ts), julian(ts),
+	yearweek(ts), date_part('year', ts), date_part(['year', 'isoyear', 'week', 'julian'], ts), monthname(ts),
+	dayname(ts)
+FROM extremes;
+
+# truncation and differences with a constant part
+
+query I
+SELECT date_trunc('month', b) FROM ts;
+----
+2024-03-01 00:00:00+00
+
+query IIIIII
+SELECT date_diff('day', a, b), date_diff('month', a, b), date_diff('year', a, b), date_sub('day', a, b),
+	date_sub('year', a, b), age(b, a)
+FROM ts;
+----
+8840	290	24	8840	24	24 years 2 months 14 days 12:00:00
+
+# a part that is not constant is only parsed during execution
+
+statement error
+SELECT date_part(bad_part, b) FROM ts;
+----
+Conversion Error: extract specifier
+
+statement error
+SELECT date_trunc(bad_part, b) FROM ts;
+----
+Conversion Error: extract specifier
+
+statement error
+SELECT date_diff(bad_part, a, b) FROM ts;
+----
+Conversion Error: extract specifier
+
+statement error
+SELECT date_sub(bad_part, a, b) FROM ts;
+----
+Conversion Error: extract specifier
+
+# differences in small parts overflow for timestamps far apart
+
+statement error
+SELECT date_sub('minute', min(ts), max(ts)) FROM extremes;
+----
+Out of Range Error: Overflow in subtraction
+
+statement error
+SELECT date_diff('minute', min(ts), max(ts)) FROM extremes;
+----
+Out of Range Error: Overflow in subtraction
+
+# other calendars can fail for extreme timestamps
+
+statement ok
+SET Calendar = 'chinese';
+
+statement error
+SELECT year(ts) FROM extremes;
+----
+Conversion Error: Unable to extract calendar part
+
+statement error
+SELECT date_part('year', ts) FROM extremes;
+----
+Conversion Error: Unable to extract calendar part
+
+statement error
+SELECT date_part(['year', 'month'], ts) FROM extremes;
+----
+Conversion Error: Unable to extract calendar part
+
+statement error
+SELECT monthname(ts) FROM extremes;
+----
+Conversion Error: Unable to extract calendar part
+
+statement error
+SELECT dayname(ts) FROM extremes;
+----
+Conversion Error: Unable to extract calendar part

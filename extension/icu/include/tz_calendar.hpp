@@ -52,9 +52,12 @@ using CalendarPtr = duckdb::unique_ptr<Calendar>;
 
 struct TZCalendar {
 	TZCalendar(Calendar &calendar_p, const string &cal_setting)
-	    : calendar(calendar_p.Copy()),
-	      is_gregorian(cal_setting.empty() || StringUtil::CIEquals(cal_setting, "gregorian")),
+	    : calendar(calendar_p.Copy()), is_gregorian(IsGregorianSetting(cal_setting)),
 	      supports_intervals(calendar->GetMaximum(CAL_MONTH) < 12) { // 0-based
+	}
+
+	static bool IsGregorianSetting(const string &cal_setting) {
+		return cal_setting.empty() || StringUtil::CIEquals(cal_setting, "gregorian");
 	}
 
 	Calendar *GetCalendar() {

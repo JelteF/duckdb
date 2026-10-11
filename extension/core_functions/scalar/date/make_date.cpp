@@ -152,17 +152,17 @@ ScalarFunctionSet MakeDateFun::GetFunctions() {
 	    .AddParameter("year", LogicalType::BIGINT)
 	    .AddParameter("month", LogicalType::BIGINT)
 	    .AddParameter("day", LogicalType::BIGINT);
+	ymd_fun.SetFallible();
 	make_date.AddFunction(ymd_fun);
 
 	child_list_t<LogicalType> make_date_children {
 	    {"year", LogicalType::BIGINT}, {"month", LogicalType::BIGINT}, {"day", LogicalType::BIGINT}};
 	ScalarFunction struct_fun({}, LogicalType::DATE, ExecuteStructMakeDate<int64_t>);
 	struct_fun.GetSignature().AddParameter("date-struct", LogicalType::STRUCT(make_date_children));
+	struct_fun.SetFallible();
 	make_date.AddFunction(struct_fun);
-	make_date.ApplyToFunctions([](ScalarFunction &func) {
-		func.SetFallible();
-		func.SetUnaryArgProperties(ArgProperties().StrictlyIncreasing());
-	});
+	make_date.ApplyToFunctions(
+	    [](ScalarFunction &func) { func.SetUnaryArgProperties(ArgProperties().StrictlyIncreasing()); });
 	return make_date;
 }
 

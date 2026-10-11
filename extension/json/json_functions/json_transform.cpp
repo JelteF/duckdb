@@ -1161,9 +1161,10 @@ static void GetTransformFunctionInternal(ScalarFunctionSet &set, const LogicalTy
 
 ScalarFunctionSet JSONFunctions::GetTransformFunction() {
 	ScalarFunctionSet set("json_transform");
+	// only parsing VARCHAR input can throw - values that cannot be transformed become NULL
 	GetTransformFunctionInternal(set, LogicalType::VARCHAR);
-	GetTransformFunctionInternal(set, LogicalType::JSON());
 	set.SetFallible();
+	GetTransformFunctionInternal(set, LogicalType::JSON());
 	return set;
 }
 

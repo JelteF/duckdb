@@ -1,5 +1,6 @@
 #include "core_functions/scalar/list_functions.hpp"
 
+#include "duckdb/common/serializer/deserializer.hpp"
 #include "duckdb/function/lambda_functions.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/planner/expression/bound_cast_expression.hpp"
@@ -211,6 +212,16 @@ LogicalType ResolveReduceAccumulatorType(ClientContext &context, const LogicalTy
 	                      initial_type.ToString(), lambda_return_type.ToString());
 }
 
+//! Besides the lambda, list_reduce throws when casting a list element to the accumulator type fails, which only
+//! happens without an initial value - the first element is then used as the accumulator
+bool ListReduceCanThrow(const Expression &lambda_expr, const LogicalType &list_type,
+                        const LogicalType &accumulator_type, bool has_initial) {
+	if (lambda_expr.CanThrow()) {
+		return true;
+	}
+	return !has_initial && LambdaFunctions::DetermineListChildType(list_type) != accumulator_type;
+}
+
 unique_ptr<FunctionData> ListReduceBind(BindScalarFunctionInput &input) {
 	auto &context = input.GetClientContext();
 	auto &bound_function = input.GetBoundFunction();
@@ -262,8 +273,26 @@ unique_ptr<FunctionData> ListReduceBind(BindScalarFunctionInput &input) {
 	// cast in place, so that the bound lambda expression stays intact as a child of the function
 	bound_lambda_expr.LambdaExprMutable() = std::move(cast_lambda_expr);
 	bound_function.SetReturnType(bound_lambda_expr.LambdaExpr()->GetReturnType());
+	if (ListReduceCanThrow(*bound_lambda_expr.LambdaExpr(), arguments[0]->GetReturnType(),
+	                       bound_function.GetReturnType(), has_initial)) {
+		bound_function.SetFallible();
+	}
 	return make_uniq<ListLambdaBindData>(bound_function.GetReturnType(), bound_lambda_expr.LambdaExpr()->Copy(),
 	                                     has_index, has_initial);
+}
+
+unique_ptr<FunctionData> ListReduceDeserialize(Deserializer &deserializer, BoundScalarFunction &bound_function) {
+	auto result = ListLambdaBindData::Deserialize(deserializer, bound_function);
+	auto &bind_data = result->Cast<ListLambdaBindData>();
+	if (!bind_data.lambda_expr) {
+		return result;
+	}
+	auto &children = deserializer.Get<const const_expression_list_t &>();
+	if (ListReduceCanThrow(*bind_data.lambda_expr, children[0].get().GetReturnType(), bind_data.return_type,
+	                       bind_data.has_initial)) {
+		bound_function.SetFallible();
+	}
+	return result;
 }
 
 LogicalType BindReduceChildren(ClientContext &context, const vector<LogicalType> &function_child_types,
@@ -335,9 +364,10 @@ ScalarFunctionSet ListReduceFun::GetFunctions() {
 
 	fun.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
 	fun.SetSerializeCallback(ListLambdaBindData::Serialize);
-	fun.SetDeserializeCallback(ListLambdaBindData::Deserialize);
+	fun.SetDeserializeCallback(ListReduceDeserialize);
 	fun.SetBindLambdaCallback(ListReduceBindLambda);
-	fun.SetFallible();
+	// fallible only if the lambda or the accumulator cast can throw, which is decided in the bind (and on
+	// deserialization) - an empty list without initial value throws, but not an execution error
 
 	ScalarFunctionSet set;
 	set.AddFunction(fun);

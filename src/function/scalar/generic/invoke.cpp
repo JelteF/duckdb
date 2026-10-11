@@ -159,8 +159,7 @@ ScalarFunction InvokeFun::GetFunction() {
 	fun.SetInitStateCallback(LambdaInvokeState::Init);
 	fun.SetSerializeCallback(LambdaInvokeData::Serialize);
 	fun.SetDeserializeCallback(LambdaInvokeData::Deserialize);
-	// the lambda expression that is executed for every row can throw
-	fun.SetFallible();
+	// whether the function can throw depends on the lambda, see PropagateLambdaProperties
 	return fun;
 }
 

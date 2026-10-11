@@ -14,6 +14,7 @@ namespace duckdb {
 
 using regexp_util::CreateStringPiece;
 using regexp_util::ParseRegexOptions;
+using regexp_util::RegexPatternCanThrow;
 using regexp_util::TryParseConstantPattern;
 
 unique_ptr<FunctionLocalState>
@@ -295,7 +296,8 @@ unique_ptr<FunctionData> RegexpExtractAllStruct::Bind(BindScalarFunctionInput &i
 	}
 	duckdb_re2::RE2::Options options;
 	string constant_string;
-	bool constant_pattern = TryParseConstantPattern(input.TryGetConstant(1), constant_string);
+	auto pattern = input.TryGetConstant(1);
+	bool constant_pattern = TryParseConstantPattern(pattern, constant_string);
 	if (!constant_pattern) {
 		throw BinderException("%s with LIST requires a constant pattern", function.GetName());
 	}
@@ -308,8 +310,39 @@ unique_ptr<FunctionData> RegexpExtractAllStruct::Bind(BindScalarFunctionInput &i
 	regexp_util::ParseGroupNameList(function.GetName().GetIdentifierName(), input.GetConstant(2), constant_string,
 	                                options, true, group_names, struct_children);
 	function.SetReturnType(LogicalType::LIST(LogicalType::STRUCT(struct_children)));
+	if (!RegexPatternCanThrow(pattern, options)) {
+		function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
 	return make_uniq<RegexpExtractAllStructBindData>(options, std::move(constant_string), constant_pattern,
 	                                                 std::move(group_names));
+}
+
+//! On top of the pattern, requesting a group that the pattern does not have throws
+static bool RegexpExtractAllCanThrow(BindScalarFunctionInput &input, const optional<Value> &pattern,
+                                     const duckdb_re2::RE2::Options &options) {
+	if (RegexPatternCanThrow(pattern, options)) {
+		return true;
+	}
+	if (pattern->IsNull() || input.GetArguments().size() < 3) {
+		return false;
+	}
+	auto group = input.TryGetConstant(2);
+	if (!group) {
+		return true;
+	}
+	auto group_value = group->DefaultTryCastAs(LogicalType::INTEGER);
+	if (!group_value) {
+		return true;
+	}
+	if (group_value->IsNull()) {
+		return false;
+	}
+	auto &pattern_string = StringValue::Get(*pattern);
+	duckdb_re2::RE2::Options compile_options(options);
+	compile_options.set_log_errors(false);
+	RE2 regex(duckdb_re2::StringPiece(pattern_string.c_str(), pattern_string.size()), compile_options);
+	// negative groups never match anything
+	return IntegerValue::Get(*group_value) > regex.NumberOfCapturingGroups();
 }
 
 unique_ptr<FunctionData> RegexpExtractAll::Bind(BindScalarFunctionInput &input) {
@@ -320,10 +353,14 @@ unique_ptr<FunctionData> RegexpExtractAll::Bind(BindScalarFunctionInput &input) 
 	duckdb_re2::RE2::Options options;
 
 	string constant_string;
-	bool constant_pattern = TryParseConstantPattern(input.TryGetConstant(1), constant_string);
+	auto pattern = input.TryGetConstant(1);
+	bool constant_pattern = TryParseConstantPattern(pattern, constant_string);
 
 	if (arguments.size() >= 4) {
 		ParseRegexOptions(input.GetConstant(3), options);
+	}
+	if (!RegexpExtractAllCanThrow(input, pattern, options)) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	}
 	return make_uniq<RegexpExtractBindData>(options, std::move(constant_string), constant_pattern,
 	                                        static_cast<int8_t>(0));

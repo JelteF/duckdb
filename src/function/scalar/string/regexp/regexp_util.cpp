@@ -16,6 +16,27 @@ bool TryParseConstantPattern(optional<Value> pattern_value, string &constant_str
 	return true;
 }
 
+bool RegexPatternCanThrow(const optional<Value> &pattern_value, duckdb_re2::RE2::Options options) {
+	if (!pattern_value) {
+		return true;
+	}
+	if (pattern_value->IsNull()) {
+		// a NULL pattern is never compiled, the result is NULL
+		return false;
+	}
+	if (pattern_value->type().id() != LogicalTypeId::VARCHAR) {
+		return true;
+	}
+	auto &pattern = StringValue::Get(*pattern_value);
+	// a substring check is conservative: it also matches an escaped backslash followed by C
+	if (pattern.find("\\C") != string::npos) {
+		return true;
+	}
+	options.set_log_errors(false);
+	RE2 regex(duckdb_re2::StringPiece(pattern.c_str(), pattern.size()), options);
+	return !regex.ok();
+}
+
 void ParseRegexOptions(const string &options, duckdb_re2::RE2::Options &result, bool *global_replace,
                        bool *no_match_returns_input) {
 	for (idx_t i = 0; i < options.size(); i++) {

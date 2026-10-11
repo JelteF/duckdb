@@ -247,6 +247,28 @@ void ArrayOrListLengthBinaryResolveTypes(ResolveScalarFunctionTypesInput &input)
 	bound_function.GetArguments()[0] = type;
 }
 
+//! Only an invalid dimension throws, so a constant dimension that is valid (or NULL) cannot error
+static void ArrayOrListLengthBinarySetErrorMode(BindScalarFunctionInput &input, int64_t max_dimension) {
+	auto &bound_function = input.GetBoundFunction();
+	bound_function.SetFallible();
+	auto dimension = input.TryGetConstant(1);
+	if (!dimension) {
+		return;
+	}
+	auto dimension_value = dimension->DefaultTryCastAs(LogicalType::BIGINT);
+	if (!dimension_value) {
+		return;
+	}
+	if (dimension_value->IsNull()) {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+		return;
+	}
+	auto dim = BigIntValue::Get(*dimension_value);
+	if (dim >= 1 && dim <= max_dimension) {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+}
+
 unique_ptr<FunctionData> ArrayOrListLengthBinaryBind(BindScalarFunctionInput &input) {
 	auto type = input.GetBoundFunction().GetArguments()[0];
 	if (type.id() == LogicalTypeId::ARRAY) {
@@ -260,10 +282,13 @@ unique_ptr<FunctionData> ArrayOrListLengthBinaryBind(BindScalarFunctionInput &in
 				break;
 			}
 		}
+		ArrayOrListLengthBinarySetErrorMode(input, static_cast<int64_t>(dimensions.size()));
 		auto data = make_uniq<ArrayLengthBinaryFunctionData>();
 		data->dimensions = dimensions;
 		return std::move(data);
 	}
+	// lists only support dimension 1
+	ArrayOrListLengthBinarySetErrorMode(input, 1);
 	return nullptr;
 }
 
@@ -313,9 +338,9 @@ ScalarFunctionSet ArrayLengthFun::GetFunctions() {
 	    .AddParameter("list", LogicalType::LIST(LogicalType::ANY))
 	    .AddParameter("dimension", LogicalType::BIGINT);
 	binary.SetResolveTypesCallback(ArrayOrListLengthBinaryResolveTypes);
+	binary.SetFallible();
 	array_length.AddFunction(binary);
 
-	array_length.SetFallible();
 	return (array_length);
 }
 

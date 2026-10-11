@@ -677,8 +677,9 @@ static void GetStructureFunctionInternal(ScalarFunctionSet &set, const LogicalTy
 ScalarFunctionSet JSONFunctions::GetStructureFunction() {
 	ScalarFunctionSet set("json_structure");
 	GetStructureFunctionInternal(set, LogicalType::VARCHAR);
-	set.SetFallible();
 	GetStructureFunctionInternal(set, LogicalType::JSON());
+	// valid JSON can still be nested too deeply to extract its structure
+	set.SetFallible();
 	return set;
 }
 

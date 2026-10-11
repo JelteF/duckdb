@@ -58,6 +58,8 @@ unique_ptr<FunctionData> ParseLogMessageBind(BindScalarFunctionInput &input) {
 		// Unstructured types we simply wrap in a struct with a single field called message
 		child_list_t<LogicalType> children = {{"message", LogicalType::VARCHAR}};
 		bound_function.SetReturnType(LogicalType::STRUCT(children));
+		// only parsing structured messages can fail
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	} else {
 		D_ASSERT(lookup->type.IsNested());
 		bound_function.SetReturnType(lookup->type);

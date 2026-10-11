@@ -20,6 +20,7 @@ namespace duckdb {
 
 using regexp_util::CreateStringPiece;
 using regexp_util::ParseRegexOptions;
+using regexp_util::RegexPatternCanThrow;
 using regexp_util::TryParseConstantPattern;
 using regexp_util::VerifyUTF8Result;
 
@@ -111,8 +112,12 @@ unique_ptr<FunctionData> RegexpMatchesBind(BindScalarFunctionInput &input) {
 	}
 
 	string constant_string;
-	bool constant_pattern;
-	constant_pattern = TryParseConstantPattern(input.TryGetConstant(1), constant_string);
+	auto pattern = input.TryGetConstant(1);
+	bool constant_pattern = TryParseConstantPattern(pattern, constant_string);
+	// also used by regexp_split_to_array, which throws for \C
+	if (!RegexPatternCanThrow(pattern, options)) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
 	return make_uniq<RegexpMatchesBindData>(options, std::move(constant_string), constant_pattern);
 }
 
@@ -174,15 +179,45 @@ bool RegexpReplaceBindData::Equals(const FunctionData &other_p) const {
 	return RegexpBaseBindData::Equals(other) && global_replace == other.global_replace;
 }
 
+//! On top of the pattern, the replacement can be invalid (e.g. reference a group that the pattern does not have)
+static bool RegexReplaceCanThrow(const optional<Value> &pattern, const optional<Value> &replacement,
+                                 const duckdb_re2::RE2::Options &options) {
+	if (RegexPatternCanThrow(pattern, options)) {
+		return true;
+	}
+	if (pattern->IsNull()) {
+		return false;
+	}
+	if (!replacement) {
+		return true;
+	}
+	if (replacement->IsNull()) {
+		return false;
+	}
+	if (replacement->type().id() != LogicalTypeId::VARCHAR) {
+		return true;
+	}
+	auto &pattern_string = StringValue::Get(*pattern);
+	auto &replacement_string = StringValue::Get(*replacement);
+	RE2 regex(duckdb_re2::StringPiece(pattern_string.c_str(), pattern_string.size()), options);
+	std::string rewrite_error;
+	return !regex.CheckRewriteString(duckdb_re2::StringPiece(replacement_string.c_str(), replacement_string.size()),
+	                                 &rewrite_error);
+}
+
 static unique_ptr<FunctionData> RegexReplaceBind(BindScalarFunctionInput &input) {
 	auto &arguments = input.GetArguments();
 	auto data = make_uniq<RegexpReplaceBindData>();
 
-	data->constant_pattern = TryParseConstantPattern(input.TryGetConstant(1), data->constant_string);
+	auto pattern = input.TryGetConstant(1);
+	data->constant_pattern = TryParseConstantPattern(pattern, data->constant_string);
 	if (arguments.size() == 4) {
 		ParseRegexOptions(input.GetConstant(3), data->options, &data->global_replace);
 	}
 	data->options.set_log_errors(false);
+	if (!RegexReplaceCanThrow(pattern, input.TryGetConstant(2), data->options)) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
 	return std::move(data);
 }
 
@@ -377,7 +412,8 @@ static unique_ptr<FunctionData> RegexExtractBind(BindScalarFunctionInput &input)
 	duckdb_re2::RE2::Options options;
 
 	string constant_string;
-	bool constant_pattern = TryParseConstantPattern(input.TryGetConstant(1), constant_string);
+	auto pattern = input.TryGetConstant(1);
+	bool constant_pattern = TryParseConstantPattern(pattern, constant_string);
 
 	bool no_match_returns_input = false;
 
@@ -410,6 +446,10 @@ static unique_ptr<FunctionData> RegexExtractBind(BindScalarFunctionInput &input)
 			}
 			group_index = static_cast<int8_t>(group_idx);
 		}
+	}
+	// out of range groups result in no match, so only the pattern can cause errors
+	if (!RegexPatternCanThrow(pattern, options)) {
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	}
 
 	return make_uniq<RegexpExtractBindData>(options, std::move(constant_string), constant_pattern, group_index,

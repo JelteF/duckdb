@@ -24,6 +24,7 @@ static unique_ptr<FunctionData> BindIEEEFloatingUnary(BindScalarFunctionInput &i
 	auto &bound_function = input.GetBoundFunction();
 	if (Settings::Get<IeeeFloatingPointOpsSetting>(input.GetClientContext())) {
 		bound_function.SetFunctionCallback(ScalarFunction::UnaryFunction<double, double, IEEE_OP>);
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	} else {
 		bound_function.SetFunctionCallback(ScalarFunction::UnaryFunction<double, double, ERROR_OP>);
 	}
@@ -35,6 +36,7 @@ static unique_ptr<FunctionData> BindIEEEFloatingBinary(BindScalarFunctionInput &
 	auto &bound_function = input.GetBoundFunction();
 	if (Settings::Get<IeeeFloatingPointOpsSetting>(input.GetClientContext())) {
 		bound_function.SetFunctionCallback(ScalarFunction::BinaryFunction<double, double, double, IEEE_OP>);
+		bound_function.SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	} else {
 		bound_function.SetFunctionCallback(ScalarFunction::BinaryFunction<double, double, double, ERROR_OP>);
 	}
@@ -214,6 +216,7 @@ static unique_ptr<BaseStatistics> PropagateAbsStats(ClientContext &context, Func
 		}
 		expr.FunctionMutable().SetFunctionCallback(
 		    ScalarFunction::GetScalarUnaryFunction<AbsOperator>(expr.GetReturnType()));
+		expr.FunctionMutable().SetErrorMode(FunctionErrors::CANNOT_ERROR);
 	}
 	auto stats = NumericStats::CreateEmpty(expr.GetReturnType());
 	NumericStats::SetMin(stats, new_min);
@@ -262,6 +265,7 @@ ScalarFunctionSet AbsOperatorFun::GetFunctions() {
 			auto function = NameXArgument(
 			    ScalarFunction({}, type, ScalarFunction::GetScalarUnaryFunction<TryAbsOperator>(type)), type);
 			function.SetStatisticsCallback(PropagateAbsStats);
+			function.SetFallible();
 			abs.AddFunction(function);
 			break;
 		}
@@ -285,7 +289,6 @@ ScalarFunctionSet AbsOperatorFun::GetFunctions() {
 			break;
 		}
 	}
-	abs.SetFallible();
 	return abs;
 }
 
@@ -746,6 +749,8 @@ unique_ptr<FunctionData> ResolveDecimalRoundPrecision(BoundScalarFunction &bound
 	}
 	bound_function.GetArguments()[0] = argument_type;
 	bound_function.SetReturnType(LogicalType::DECIMAL(result_width, target_scale));
+	bound_function.SetErrorMode(check_overflow ? FunctionErrors::CAN_THROW_RUNTIME_ERROR
+	                                           : FunctionErrors::CANNOT_ERROR);
 	return make_uniq<RoundPrecisionFunctionData>(round_value, width, check_overflow);
 }
 
@@ -1144,6 +1149,23 @@ struct DecimalRoundPositivePrecisionOperator {
 	}
 };
 
+//! Rounding an integer only overflows for a negative precision
+static unique_ptr<FunctionData> BindRoundIntegerPrecision(BindScalarFunctionInput &input) {
+	auto precision = input.TryGetConstant(1);
+	if (!precision) {
+		return nullptr;
+	}
+	if (precision->IsNull()) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+		return nullptr;
+	}
+	auto precision_value = precision->DefaultTryCastAs(LogicalType::INTEGER);
+	if (precision_value && !precision_value->IsNull() && IntegerValue::Get(*precision_value) >= 0) {
+		input.GetBoundFunction().SetErrorMode(FunctionErrors::CANNOT_ERROR);
+	}
+	return nullptr;
+}
+
 ScalarFunctionSet RoundFun::GetFunctions() {
 	ScalarFunctionSet round;
 	for (auto &type : LogicalType::Numeric()) {
@@ -1211,12 +1233,12 @@ ScalarFunctionSet RoundFun::GetFunctions() {
 		round_binary_function.SetResolveTypesCallback(resolve_prec_func);
 		auto round_prec_function = NameXPrecisionArguments(std::move(round_binary_function), type);
 		if (type.id() == LogicalTypeId::DECIMAL) {
-			// rounding a DECIMAL can overflow
-			round_function.SetFallible();
+			// rounding a DECIMAL(38, 0) to a negative precision can overflow, decided in the bind
 			round_prec_function.SetFallible();
 		} else if (type.IsIntegral()) {
 			// rounding an integer to a negative precision can overflow
 			round_prec_function.SetFallible();
+			round_prec_function.SetBindCallback(BindRoundIntegerPrecision);
 		}
 		round.AddFunction(std::move(round_function));
 		round.AddFunction(std::move(round_prec_function));
@@ -1281,11 +1303,12 @@ ScalarFunctionSet RoundEvenFun::GetFunctions() {
 		round_even_binary_function.SetResolveTypesCallback(resolve_prec_func);
 		auto round_even_function = NameXPrecisionArguments(std::move(round_even_binary_function), type);
 		if (type.id() == LogicalTypeId::DECIMAL) {
-			// rounding a DECIMAL can overflow
+			// rounding a DECIMAL(38, 0) to a negative precision can overflow, decided in the bind
 			round_even_function.SetFallible();
 		} else if (type.IsIntegral()) {
 			// rounding an integer to a negative precision can overflow
 			round_even_function.SetFallible();
+			round_even_function.SetBindCallback(BindRoundIntegerPrecision);
 		}
 		round_even.AddFunction(std::move(round_even_function));
 	}

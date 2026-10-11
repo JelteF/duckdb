@@ -1,0 +1,127 @@
+# name: test/sql/function/numeric/test_numeric_function_fallibility.test
+# description: Numeric functions that are (conditionally) marked as not throwing still throw proper errors where they can
+# group: [numeric]
+
+statement ok
+CREATE TABLE nums AS SELECT * FROM (VALUES
+	(-127::TINYINT, -1.5::DOUBLE, -12.34::DECIMAL(4,2), 200::UTINYINT, -3::HUGEINT, 4.0::DOUBLE),
+	(5::TINYINT, 2.5::DOUBLE, 99.99::DECIMAL(4,2), 1::UTINYINT, 7::HUGEINT, 0.0::DOUBLE),
+	(NULL, NULL, NULL, NULL, NULL, NULL)
+) v(t, d, dec, u, h, pos);
+
+statement ok
+CREATE TABLE min_ints AS SELECT * FROM (VALUES ((-128)::TINYINT), (1::TINYINT)) v(t);
+
+# abs only throws for the minimum of signed integers
+query IIIII
+SELECT abs(t), abs(d), abs(dec), abs(u), abs(h) FROM nums ORDER BY ALL;
+----
+5	2.5	99.99	1	7
+127	1.5	12.34	200	3
+NULL	NULL	NULL	NULL	NULL
+
+statement error
+SELECT abs(t) FROM min_ints;
+----
+Out of Range Error: Overflow on abs(-128)
+
+# the IEEE floating point operations do not throw
+query IIIIII
+SELECT isnan(sqrt(d)), ln(pos), log10(pos), log2(pos), log(pos, 2), pow(pos, -1) FROM nums ORDER BY ALL;
+----
+false	-inf	-inf	-inf	-0.0	inf
+true	1.3862943611198906	0.6020599913279624	2.0	0.5	0.25
+NULL	NULL	NULL	NULL	NULL	NULL
+
+query IIIIII
+SELECT isnan(asin(d)), isnan(acos(d)), isnan(atanh(d)), gamma(pos), lgamma(pos), round(cot(pos), 6) FROM nums ORDER BY ALL;
+----
+true	true	true	6.0	1.791759469228055	0.863691
+true	true	true	inf	inf	inf
+NULL	NULL	NULL	NULL	NULL	NULL
+
+statement ok
+SET ieee_floating_point_ops = false;
+
+statement error
+SELECT sqrt(d) FROM nums;
+----
+Out of Range Error: cannot take square root of a negative number
+
+statement error
+SELECT ln(pos) FROM nums;
+----
+Out of Range Error: cannot take logarithm of zero
+
+statement error
+SELECT pow(pos, -1) FROM nums;
+----
+Out of Range Error: zero raised to a negative power is undefined
+
+statement error
+SELECT asin(d) FROM nums;
+----
+Invalid Input Error: ASIN is undefined outside [-1,1]
+
+statement error
+SELECT cot(pos) FROM nums;
+----
+Out of Range Error: input value 0.000000 is out of range for numeric function cotangent
+
+statement error
+SELECT gamma(pos) FROM nums;
+----
+Out of Range Error: cannot take gamma of zero
+
+statement ok
+RESET ieee_floating_point_ops;
+
+# round
+statement ok
+CREATE TABLE decimals AS SELECT * FROM (VALUES
+	(12.35::DECIMAL(4,2), 99999999999999999999999999999999999999::DECIMAL(38,0), 125::INTEGER, 127::TINYINT, -1),
+	(-99.95::DECIMAL(4,2), 1::DECIMAL(38,0), -125::INTEGER, 1::TINYINT, 1)
+) v(d, big, i, t, p);
+
+query IIIIII
+SELECT round(d), round(d, 1), round(d, -1), round_even(d, 1), round(big, 1), round(i, 1) FROM decimals ORDER BY ALL;
+----
+-100	-100.0	-100	-100.0	1	-125
+12	12.4	10	12.4	99999999999999999999999999999999999999	125
+
+query IIII
+SELECT round(i, NULL), round_even(i, 0), round(t, 2), round(i, -1) FROM decimals ORDER BY ALL;
+----
+NULL	-125	1	-130
+NULL	125	127	130
+
+statement error
+SELECT round(big, -1) FROM decimals;
+----
+Out of Range Error: Overflow in ROUND of DECIMAL(38)
+
+statement error
+SELECT round_even(big, -1) FROM decimals;
+----
+Out of Range Error: Overflow in ROUND_EVEN of DECIMAL(38)
+
+statement error
+SELECT round(t, -1) FROM decimals;
+----
+Out of Range Error: Overflow in ROUND of integer
+
+statement error
+SELECT round_even(t, -1) FROM decimals;
+----
+Out of Range Error: Overflow in ROUND_EVEN of integer
+
+statement error
+SELECT round(t, -abs(p)) FROM decimals;
+----
+Out of Range Error: Overflow in ROUND of integer
+
+# mad of floating point values
+query I
+SELECT mad(d) FROM nums;
+----
+2.0

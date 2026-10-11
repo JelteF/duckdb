@@ -1,0 +1,232 @@
+# name: test/sql/function/date/test_date_function_fallibility.test
+# description: Date and time functions that are (conditionally) marked as not throwing still throw proper errors where they can
+# group: [date]
+
+statement ok
+CREATE TABLE ints AS SELECT * FROM (VALUES (125::INTEGER), (-125::INTEGER)) v(i);
+
+# make_date from days since the epoch does not throw
+query I
+SELECT make_date(i) FROM ints ORDER BY ALL;
+----
+1969-08-29
+1970-05-06
+
+statement error
+SELECT make_date(2000, i, 1) FROM ints;
+----
+Conversion Error: Date out of range
+
+# to_months/to_days of an INTEGER and to_microseconds do not throw
+query III
+SELECT to_months(i), to_days(i), to_microseconds(i::BIGINT) FROM ints ORDER BY ALL;
+----
+-10 years -5 months	-125 days	-00:00:00.000125
+10 years 5 months	125 days	00:00:00.000125
+
+statement error
+SELECT to_months(i::BIGINT * 100000000) FROM ints;
+----
+Invalid Input Error: Type INT64 with value
+
+# date parts
+statement ok
+CREATE TABLE temporals AS SELECT * FROM (VALUES
+	(DATE '1992-01-01', TIMESTAMP '1992-03-04 12:34:56', INTERVAL '14 months 3 days', TIME '12:00:00', '12:00:00'::TIME_NS, '12:00:00+01'::TIMETZ, 'foo'),
+	(DATE 'infinity', TIMESTAMP '-infinity', INTERVAL '-1 day', TIME '00:00:01', '00:00:01'::TIME_NS, '00:00:01-02'::TIMETZ, 'year')
+) v(d, ts, i, t, tns, ttz, part);
+
+query IIIIIIII
+SELECT year(d), month(ts), day(i), decade(i), century(d), quarter(i), dayofweek(ts), isoyear(d) FROM temporals ORDER BY ALL;
+----
+1992	3	3	0	20	1	3	1992
+NULL	NULL	-1	0	NULL	1	NULL	NULL
+
+statement error
+SELECT dayofweek(i) FROM temporals;
+----
+Not implemented Error: interval units "dow" not recognized
+
+query III
+SELECT timezone(t), timezone(tns), timezone(ttz) FROM temporals ORDER BY ALL;
+----
+0	0	-7200
+0	0	3600
+
+statement ok
+CREATE TABLE timezones AS SELECT * FROM (VALUES (INTERVAL '20 hours', '12:00:00+01'::TIMETZ)) v(i, ttz);
+
+statement error
+SELECT timezone(i, ttz) FROM timezones;
+----
+Out of Range Error: Timezone offset out of range
+
+query IIIII
+SELECT epoch_ns(t), epoch_ns(tns), epoch_ns(ttz), epoch_ns(ts::TIMESTAMP_NS), epoch_us(ts) FROM temporals ORDER BY ALL;
+----
+1000000000	1000000000	1000000000	NULL	NULL
+43200000000000	43200000000000	43200000000000	699712496000000000	699712496000000
+
+query IIIII
+SELECT epoch_ms(ts), epoch_ms(d), epoch_ms(t), epoch_ms(tns), epoch_us(tns) FROM temporals ORDER BY ALL;
+----
+699712496000	694224000000	43200000	43200000	43200000000
+NULL	NULL	1000	1000	1000000
+
+statement ok
+CREATE TABLE extremes AS SELECT * FROM (VALUES (DATE '5881580-07-10', TIMESTAMP '294247-01-10 04:00:54', TIMESTAMP '290309-12-22 (BC) 00:00:00')) v(d, ts_max, ts_min);
+
+statement error
+SELECT epoch_ns(ts_max) FROM extremes;
+----
+Conversion Error: Could not convert Timestamp(US) to Timestamp(NS)
+
+statement error
+SELECT epoch_us(d) FROM extremes;
+----
+Conversion Error: Could not convert DATE
+
+query II
+SELECT last_day(ts_max), last_day(ts_min) FROM extremes;
+----
+294247-01-31	290309-12-31 (BC)
+
+statement error
+SELECT last_day(d) FROM extremes;
+----
+Conversion Error: Date out of range
+
+# date_part with a constant part does not throw
+query II
+SELECT date_part('year', d), date_part('dow', ts) FROM temporals ORDER BY ALL;
+----
+1992	3
+NULL	NULL
+
+statement error
+SELECT date_part(part, d) FROM temporals;
+----
+Conversion Error: extract specifier "foo" not recognized
+
+# date_diff / date_sub with a constant part
+query IIIII
+SELECT date_diff('day', d, d + 10), date_diff('month', ts, ts + INTERVAL 3 MONTH), date_diff('hour', t, t), date_sub('month', ts, ts + INTERVAL 3 MONTH), date_sub('minute', t, t) FROM temporals ORDER BY ALL;
+----
+10	3	0	3	0
+NULL	NULL	0	NULL	0
+
+statement error
+SELECT date_diff('microseconds', ts_min, ts_max) FROM extremes;
+----
+Out of Range Error: Overflow in subtraction
+
+statement error
+SELECT date_sub('microseconds', ts_min, ts_max) FROM extremes;
+----
+Out of Range Error: Overflow in subtraction
+
+statement error
+SELECT date_sub('day', d, d) FROM extremes;
+----
+Conversion Error: Date and time not in timestamp range
+
+statement error
+SELECT date_diff(part, d, d) FROM temporals;
+----
+Conversion Error: extract specifier "foo" not recognized
+
+statement error
+SELECT date_sub(part, ts, ts) FROM temporals;
+----
+Conversion Error: extract specifier "foo" not recognized
+
+# date_trunc of an interval with a constant part does not throw
+query II
+SELECT date_trunc('year', i), date_trunc('day', i) FROM temporals ORDER BY ALL;
+----
+00:00:00	-1 day
+1 year	1 year 2 months 3 days
+
+statement error
+SELECT date_trunc(part, i) FROM temporals;
+----
+Conversion Error: extract specifier "foo" not recognized
+
+# strftime
+statement ok
+CREATE TABLE dates AS SELECT * FROM (VALUES (DATE '1992-01-01'), (DATE '-5877641-06-25'), (DATE '5881580-07-10'), (NULL)) v(d);
+
+statement ok
+CREATE TABLE timestamps AS SELECT * FROM (VALUES (TIMESTAMP '1992-01-01 12:34:56'), (make_timestamp(-9223372036854775000::BIGINT)), (NULL)) v(ts);
+
+query II
+SELECT strftime(d, '%Y-%m-%d %j %a %A %b %B %u %w %y'), strftime(d, NULL) FROM dates ORDER BY ALL;
+----
+-5877641-06-25 176 Thu Thursday Jun June 4 4 41	NULL
+1992-01-01 001 Wed Wednesday Jan January 3 3 92	NULL
+5881580-07-10 192 Thu Thursday Jul July 4 4 80	NULL
+NULL	NULL
+
+query I
+SELECT strftime(d, '%V %W') FROM dates WHERE d > DATE '1000-01-01' ORDER BY ALL;
+----
+01 00
+28 27
+
+statement error
+SELECT strftime(d, '%G') FROM dates;
+----
+Conversion Error: Date out of range
+
+statement error
+SELECT strftime(d, '%V') FROM dates;
+----
+Conversion Error: Date out of range
+
+statement error
+SELECT strftime(d, '%U') FROM dates;
+----
+Conversion Error: Date out of range
+
+statement error
+SELECT strftime('%W', d) FROM dates;
+----
+Conversion Error: Date out of range
+
+query I
+SELECT strftime(ts, '%Y-%m-%d %H:%M:%S') FROM timestamps WHERE ts > TIMESTAMP '1000-01-01' ORDER BY ALL;
+----
+1992-01-01 12:34:56
+
+# timestamps close to the minimum can not be converted to a date and time, regardless of the format
+statement error
+SELECT strftime(ts, '%Y') FROM timestamps;
+----
+Conversion Error: Date out of range in timestamp conversion
+
+query I
+SELECT strftime(ts::TIMESTAMP_NS, '%Y-%m-%d %G %V %U %W') FROM timestamps WHERE ts > TIMESTAMP '1000-01-01' OR ts IS NULL ORDER BY ALL;
+----
+1992-01-01 1992 01 00 00
+NULL
+
+query I
+SELECT strftime(ts, NULL) FROM timestamps;
+----
+NULL
+NULL
+NULL
+
+# TIME +/- INTERVAL wraps around midnight
+statement ok
+CREATE TABLE times AS SELECT TIME '04:00:00' t, TIMETZ '04:00:00+02' tz, to_microseconds(-9223372036854775808) i
+
+query IIIIII
+SELECT t + i, i + t, t - i, tz + i, i + tz, tz - i FROM times
+----
+23:59:05.224192	23:59:05.224192	08:00:54.775808	23:59:05.224192+02	23:59:05.224192+02	08:00:54.775808+02
+
+query II
+SELECT t - INTERVAL 5 HOURS, tz - INTERVAL 5 HOURS FROM times
+----
+23:00:00	23:00:00+02

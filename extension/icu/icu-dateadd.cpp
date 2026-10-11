@@ -21,6 +21,14 @@ static duckdb::unique_ptr<FunctionData> ICUBindIntervalMonths(BindScalarFunction
 	return std::move(result);
 }
 
+//! With the Gregorian calendar the age is computed from the fields of the timestamps, which cannot fail. Other
+//! calendars count the differences in the calendar, which can fail for timestamps far apart.
+static duckdb::unique_ptr<FunctionData> ICUBindAge(BindScalarFunctionInput &input) {
+	auto result = ICUBindIntervalMonths(input);
+	ICUDateFunc::SetCannotErrorIfGregorian(input.GetBoundFunction(), result->Cast<ICUDateFunc::BindData>());
+	return result;
+}
+
 struct ICUCalendarAdd {
 	template <class TA, class TB, class TR>
 	static inline TR Operation(TA left, TB right, TZCalendar &calendar_p) {
@@ -315,11 +323,13 @@ struct ICUDateAdd : public ICUDateFunc {
 		    LogicalType::TIMESTAMP_TZ, LogicalType::TIMESTAMP_TZ);
 		binary_fun.GetSignature().GetParameter(0).SetName("timestamp1");
 		binary_fun.GetSignature().GetParameter(1).SetName("timestamp2");
+		binary_fun.SetBindCallback(ICUBindAge);
 		set.AddFunction(binary_fun);
 		auto unary_fun = GetUnaryAgeFunction<timestamp_tz_t, ICUCalendarAge>(LogicalType::TIMESTAMP_TZ);
 		unary_fun.GetSignature().GetParameter(0).SetName("timestamp");
+		unary_fun.SetBindCallback(ICUBindAge);
 		set.AddFunction(unary_fun);
-		// throws for dates that overflow the timestamp range
+		// non-Gregorian calendars can fail for timestamps far apart - cleared in the bind for the Gregorian calendar
 		set.SetFallible();
 		loader.RegisterFunction(set);
 	}
