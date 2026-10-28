@@ -33,13 +33,47 @@ struct StructUpdateBindData : public FunctionData {
 	                      const BoundScalarFunction &function) {
 		auto &info = bind_data->Cast<StructUpdateBindData>();
 		serializer.WriteProperty(100, "variable_return_type", info.stype);
-		serializer.WritePropertyWithDefault(101, "field_indexes", info.field_indexes);
+		if (serializer.ShouldSerialize(StorageVersion::V2_0_0)) {
+			// older versions fail on fields they don't know, and find the updated fields from the argument aliases
+			serializer.WritePropertyWithDefault(101, "field_indexes", info.field_indexes);
+		}
 	}
 
 	static unique_ptr<FunctionData> Deserialize(Deserializer &deserializer, BoundScalarFunction &bound_function) {
 		auto stype = deserializer.ReadProperty<LogicalType>(100, "variable_return_type");
 		auto field_indexes = deserializer.ReadPropertyWithDefault<vector<idx_t>>(101, "field_indexes");
+		if (field_indexes.empty()) {
+			// Binding always records a field for every updated argument, so the mapping is only missing from plans
+			// written before v2.0.0. Those name the updated field in the alias of each argument, which deserializing
+			// the function restored as its argument names.
+			field_indexes = FieldIndexesFromNames(stype, bound_function.GetNamedArguments());
+		}
 		return make_uniq<StructUpdateBindData>(std::move(stype), std::move(field_indexes));
+	}
+
+private:
+	static vector<idx_t> FieldIndexesFromNames(const LogicalType &stype, const vector<Identifier> &names) {
+		if (names.empty()) {
+			throw SerializationException("struct_update was serialized without the names of the updated fields");
+		}
+		auto &fields = StructType::GetChildTypes(stype);
+		vector<idx_t> field_indexes;
+		for (auto &name : names) {
+			optional_idx field_index;
+			for (idx_t field_idx = 0; field_idx < fields.size(); field_idx++) {
+				if (fields[field_idx].first == name) {
+					field_index = field_idx;
+					break;
+				}
+			}
+			if (!field_index.IsValid()) {
+				throw SerializationException(
+				    "struct_update was serialized with an argument named \"%s\", which is not a field of its result",
+				    name.GetIdentifierName());
+			}
+			field_indexes.push_back(field_index.GetIndex());
+		}
+		return field_indexes;
 	}
 };
 
