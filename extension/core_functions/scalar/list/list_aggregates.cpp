@@ -52,8 +52,40 @@ struct ListAggregatesBindData : public FunctionData {
 	static unique_ptr<ListAggregatesBindData> Deserialize(Deserializer &deserializer) {
 		auto stype = deserializer.ReadProperty<LogicalType>(1, "stype");
 		auto aggr_expr = deserializer.ReadProperty<unique_ptr<Expression>>(2, "aggr_expr");
+		RebindLegacyAggregate(deserializer.Get<ClientContext &>(), aggr_expr);
 		auto result = make_uniq<ListAggregatesBindData>(std::move(stype), std::move(aggr_expr));
 		return result;
+	}
+
+	//! Plans written before v2.0.0 pass the list elements to the aggregate as a typed NULL constant, which only stood
+	//! in for their type. Deserializing binds the aggregate again, and a bind that derives an argument from its input
+	//! (e.g. min/max of TIMETZ, which now compare the collated value through arg_min/arg_max) derives it from that
+	//! NULL constant instead, and folds it into a NULL constant. Every list element then compared as NULL, so e.g.
+	//! list_min returned NULL. Bind such an aggregate again over a reference to the list elements, as newer plans do,
+	//! so that the derived arguments are evaluated over the actual elements.
+	static void RebindLegacyAggregate(ClientContext &context, unique_ptr<Expression> &aggr_expr) {
+		if (aggr_expr->GetExpressionClass() != ExpressionClass::BOUND_AGGREGATE) {
+			return;
+		}
+		auto &aggr = aggr_expr->Cast<BoundAggregateExpression>();
+		auto &children = aggr.GetChildrenMutable();
+		if (children.empty() || children[0]->GetExpressionClass() != ExpressionClass::BOUND_CONSTANT) {
+			return;
+		}
+		// the arguments that the bind added behind the ones it received are the derived ones - without them the
+		// aggregate does not depend on the placeholder's value, so it is left as it was deserialized
+		const auto argument_count = aggr.Function().GetLogicalArguments().size();
+		if (argument_count == 0 || children.size() <= argument_count) {
+			return;
+		}
+		vector<unique_ptr<Expression>> arguments;
+		arguments.push_back(make_uniq<BoundReferenceExpression>(children[0]->GetReturnType(), idx_t(0)));
+		for (idx_t child_idx = 1; child_idx < argument_count; child_idx++) {
+			arguments.push_back(std::move(children[child_idx]));
+		}
+		FunctionBinder function_binder(context);
+		aggr_expr = function_binder.BindAggregateFunction(aggr.Function().GetDefinition(), std::move(arguments),
+		                                                  nullptr, aggr.GetAggregateType());
 	}
 
 	static void SerializeFunction(Serializer &serializer, const optional_ptr<FunctionData> bind_data_p,
