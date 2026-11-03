@@ -362,8 +362,9 @@ bool LazyMultiFileList::ExpandNextPathInternal() const {
 	if (all_files_expanded) {
 		return false;
 	}
-	if (context && context->IsInterrupted()) {
-		throw InterruptException();
+	if (context) {
+		// each expansion step can be a slow remote listing, so read the clock every time
+		context->BlockingInterruptCheck();
 	}
 	if (!ExpandNextPath()) {
 		all_files_expanded = true;
