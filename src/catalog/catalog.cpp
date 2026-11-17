@@ -47,6 +47,11 @@
 #include "duckdb/catalog/entry_scan_filters.hpp"
 #include "duckdb/common/numeric_utils.hpp"
 #include "duckdb/planner/filter/expression_filter.hpp"
+#include "duckdb/planner/expression/bound_comparison_expression.hpp"
+#include "duckdb/planner/expression/bound_conjunction_expression.hpp"
+#include "duckdb/planner/expression/bound_constant_expression.hpp"
+#include "duckdb/planner/expression/bound_function_expression.hpp"
+#include "duckdb/planner/expression/bound_operator_expression.hpp"
 #include "duckdb/storage/database_size.hpp"
 #include "duckdb/main/settings.hpp"
 #include <algorithm>
@@ -1553,6 +1558,64 @@ bool SchemaScanFilters::Accepts(ClientContext &context, const SchemaCatalogEntry
 bool EntryScanFilters::Accepts(ClientContext &context, const CatalogEntry &entry) const {
 	return SchemaScanFilters::Satisfies(context, name, Value(entry.name.GetIdentifierName())) &&
 	       SchemaScanFilters::Satisfies(context, oid, Value::BIGINT(NumericCast<int64_t>(entry.oid)));
+}
+
+static bool TryGetEntryNames(const Expression &expr, vector<string> &names) {
+	if (expr.GetExpressionType() == ExpressionType::COMPARE_IN) {
+		auto &children = expr.Cast<BoundOperatorExpression>().GetChildren();
+		if (children.empty() || !ExpressionFilter::IsSimpleFilterColumnRef(*children[0])) {
+			return false;
+		}
+		for (idx_t i = 1; i < children.size(); i++) {
+			if (children[i]->GetExpressionClass() != ExpressionClass::BOUND_CONSTANT) {
+				return false;
+			}
+			auto &value = children[i]->Cast<BoundConstantExpression>().GetValue();
+			if (value.type().id() != LogicalTypeId::VARCHAR) {
+				return false;
+			}
+			// NULL never equals a name, so it contributes no lookup
+			if (!value.IsNull()) {
+				names.push_back(StringValue::Get(value));
+			}
+		}
+		return true;
+	}
+	if (BoundComparisonExpression::IsComparison(expr)) {
+		ExpressionType comparison_type;
+		auto constant =
+		    ExpressionFilter::TryGetColumnConstantComparison(expr.Cast<BoundFunctionExpression>(), comparison_type);
+		if (!constant || comparison_type != ExpressionType::COMPARE_EQUAL) {
+			return false;
+		}
+		auto &value = constant->GetValue();
+		if (value.type().id() != LogicalTypeId::VARCHAR) {
+			return false;
+		}
+		if (!value.IsNull()) {
+			names.push_back(StringValue::Get(value));
+		}
+		return true;
+	}
+	if (expr.GetExpressionType() == ExpressionType::CONJUNCTION_AND) {
+		// one child that pins the names is enough: the whole filter is still evaluated on every entry found
+		for (auto &child : expr.Cast<BoundConjunctionExpression>().GetChildren()) {
+			vector<string> child_names;
+			if (TryGetEntryNames(*child, child_names)) {
+				names = std::move(child_names);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool EntryScanFilters::TryGetNames(vector<string> &names) const {
+	if (!name) {
+		return false;
+	}
+	auto &expr_filter = ExpressionFilter::GetExpressionFilter(*name, "EntryScanFilters");
+	return TryGetEntryNames(*expr_filter.expr, names);
 }
 
 vector<reference<SchemaCatalogEntry>> Catalog::GetSchemasForScan(ClientContext &context,

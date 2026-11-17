@@ -34,6 +34,10 @@ public:
 
 	//! Whether the entry satisfies every filter present; a missing filter accepts everything.
 	bool Accepts(ClientContext &context, const CatalogEntry &entry) const;
+	//! The names the name filter restricts the entries to, when it is an equality or IN over constants (possibly
+	//! AND-ed with other predicates). Returns false when there is no name filter or it has another shape, so every
+	//! entry must be listed.
+	bool TryGetNames(vector<string> &names) const;
 
 private:
 	optional_ptr<const TableFilter> name;

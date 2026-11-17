@@ -22,6 +22,8 @@
 #include "duckdb/catalog/default/default_types.hpp"
 #include "duckdb/catalog/default/default_views.hpp"
 #include "duckdb/catalog/dependency_list.hpp"
+#include "duckdb/catalog/entry_scan_filters.hpp"
+#include "duckdb/common/algorithm.hpp"
 #include "duckdb/main/attached_database.hpp"
 #include "duckdb/main/database.hpp"
 #include "duckdb/parser/constraints/foreign_key_constraint.hpp"
@@ -354,6 +356,35 @@ void DuckSchemaEntry::Scan(CatalogType type, VisibilityBound bound,
                            const std::function<void(CatalogEntry &)> &callback) {
 	auto &set = GetCatalogSet(type);
 	set.Scan(bound, callback);
+}
+
+void DuckSchemaEntry::Scan(ClientContext &context, SchemaScanInfo &info) {
+	vector<string> names;
+	if (!info.filter || !info.filter->TryGetNames(names)) {
+		SchemaCatalogEntry::Scan(context, info);
+		return;
+	}
+	// One point lookup per name instead of listing the whole set. Lookups are case-insensitive while the SQL filter is
+	// not, so a name can find an entry spelled differently; Accepts drops those.
+	auto transaction = GetCatalogTransaction(context);
+	auto &set = GetCatalogSet(info.type);
+	vector<reference<CatalogEntry>> entries;
+	for (auto &name : names) {
+		auto entry = set.GetEntry(transaction, Identifier(name));
+		if (entry && info.filter->Accepts(context, *entry)) {
+			entries.push_back(*entry);
+		}
+	}
+	// Same order as the listing. Two names that differ only in case can find the same entry, which ends up adjacent.
+	std::sort(entries.begin(), entries.end(),
+	          [](reference<CatalogEntry> l, reference<CatalogEntry> r) { return l.get().name < r.get().name; });
+	entries.erase(
+	    std::unique(entries.begin(), entries.end(),
+	                [](reference<CatalogEntry> l, reference<CatalogEntry> r) { return &l.get() == &r.get(); }),
+	    entries.end());
+	for (auto &entry : entries) {
+		info.callback(entry.get());
+	}
 }
 
 void DuckSchemaEntry::DropEntry(ClientContext &context, DropInfo &info) {
