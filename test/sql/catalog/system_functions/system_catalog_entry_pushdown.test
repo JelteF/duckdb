@@ -305,3 +305,103 @@ query II
 EXPLAIN ANALYZE SELECT table_name FROM duckdb_tables() WHERE database_name = 'db1' AND schema_name = 's1';
 ----
 analyzed_plan	<REGEX>:.*Entries Scanned: 3/3.*
+
+# ------------------------------------------------------------------------------------------------
+# 7. Name lookups: equality and IN on the entry name become point lookups in DuckDB schemas, any
+#    other shape lists the schema and filters each entry
+# ------------------------------------------------------------------------------------------------
+
+# lookups are case-insensitive, the SQL filter is not: a case variant matches nothing
+query I
+SELECT table_name FROM duckdb_tables() WHERE table_name = 'T1';
+----
+
+statement ok
+CREATE TABLE db1.s1."MixedCase"(i INTEGER);
+
+# all three names look up the same table, which is returned once
+query I
+SELECT table_name FROM duckdb_tables() WHERE table_name IN ('MixedCase', 'mixedcase', 'MIXEDCASE');
+----
+MixedCase
+
+query II
+SELECT database_name, table_name FROM duckdb_tables() WHERE table_name IN ('t1b', NULL, 'nope') ORDER BY ALL;
+----
+db1	t1b
+db2	t1b
+
+# names come back in the same order as a full listing
+query I
+SELECT table_name FROM duckdb_tables() WHERE database_name = 'db1' AND table_name IN ('t1b', 'MixedCase', 't1');
+----
+MixedCase
+t1
+t1b
+
+# equality AND-ed with another predicate on the same column: the lookup uses the equality, the scan applies both
+query I
+SELECT table_name FROM duckdb_tables() WHERE table_name = 't1' AND table_name LIKE '%1' AND database_name = 'db2';
+----
+t1
+
+query I
+SELECT table_name FROM duckdb_tables() WHERE table_name = 't1' AND table_name NOT LIKE '%1';
+----
+
+# tables and views share a catalog set: a lookup of a view's name finds nothing in duckdb_tables and vice versa
+query I
+SELECT table_name FROM duckdb_tables() WHERE table_name = 'v1';
+----
+
+query I
+SELECT view_name FROM duckdb_views() WHERE view_name = 't1';
+----
+
+statement ok
+CREATE TEMP TABLE tmp_t(i INTEGER);
+
+query II
+SELECT database_name, temporary FROM duckdb_tables() WHERE table_name = 'tmp_t';
+----
+temp	true
+
+# transaction visibility: a dropped table is gone and a table created in the transaction is found
+statement ok
+BEGIN;
+
+statement ok
+CREATE TABLE db1.s1.tx_t(i INTEGER);
+
+statement ok
+DROP TABLE db1.s2.t2;
+
+query II
+SELECT database_name, table_name FROM duckdb_tables() WHERE table_name IN ('tx_t', 't2') ORDER BY ALL;
+----
+db1	tx_t
+db2	t2
+
+statement ok
+ROLLBACK;
+
+# join filter pushed onto table_name
+query II
+SELECT t.database_name, t.table_name FROM duckdb_tables() t JOIN (VALUES ('t1'), ('t2')) v(n) ON t.table_name = v.n ORDER BY ALL;
+----
+db1	t1
+db1	t2
+db2	t1
+db2	t2
+
+# information_schema.tables passes the table_name filter through to the scan
+query II
+SELECT table_catalog, table_schema FROM information_schema.tables WHERE table_name = 't1' ORDER BY ALL;
+----
+db1	s1
+db2	s1
+
+query II
+EXPLAIN SELECT table_schema FROM information_schema.tables WHERE table_name = 't1';
+----
+physical_plan	<REGEX>:.*Filters:.*table_name.*t1.*
