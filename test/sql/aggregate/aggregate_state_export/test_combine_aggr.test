@@ -10,12 +10,12 @@ statement ok
 create table states as select g, avg(d) export_state state from dummy group by g;
 
 # Equivalent to the direct avg
-query I res0
+query I nosort res0
 select finalize(combine_aggr(state))::integer from states;
 ----
 50
 
-query I res0
+query I nosort res0
 select avg(d)::integer from dummy;
 ----
 50
