@@ -1,7 +1,10 @@
 #include "duckdb/function/table/system_functions.hpp"
 
+#include "duckdb/common/algorithm.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/parser/parser.hpp"
+#include "duckdb/parser/peg/compiled_grammar.hpp"
+#include "duckdb/parser/peg/keyword_helper/duckdb_keyword_helper.hpp"
 
 namespace duckdb {
 
@@ -24,9 +27,34 @@ static unique_ptr<FunctionData> DuckDBKeywordsBind(ClientContext &context, Table
 	return nullptr;
 }
 
+//! Grammar extensions mostly add words only as literals in their rules, without a keyword category. Those words are
+//! still accepted as identifiers, so they are reported as unreserved. The base grammar's literal-only words are left
+//! out, so the built-in part of the list stays the same as without grammar extensions.
+static vector<ParserKeyword> ExtendedGrammarKeywords(const CompiledGrammar &grammar) {
+	auto &keyword_helper = grammar.GetKeywordHelper();
+	auto &base_keyword_helper = DuckDBKeywordHelper::Instance();
+	auto result = keyword_helper.KeywordList();
+	vector<ParserKeyword> literal_words;
+	keyword_helper.GetLiteralTable().ForEachLiteral([&](const string &text, const LiteralInfo &info) {
+		if (info.IsKeyword() || !keyword_helper.IsGrammarWord(text) || base_keyword_helper.IsGrammarWord(text)) {
+			return;
+		}
+		literal_words.push_back({StringUtil::Lower(text), "unreserved"});
+	});
+	std::sort(literal_words.begin(), literal_words.end(),
+	          [](const ParserKeyword &a, const ParserKeyword &b) { return a.name < b.name; });
+	result.insert(result.end(), literal_words.begin(), literal_words.end());
+	return result;
+}
+
 unique_ptr<GlobalTableFunctionState> DuckDBKeywordsInit(ClientContext &context, TableFunctionInitInput &input) {
 	auto result = make_uniq<DuckDBKeywordsData>();
-	result->entries = Parser::KeywordList();
+	auto grammar = CompiledGrammar::Get(context);
+	if (grammar == CompiledGrammar::DefaultGrammar()) {
+		result->entries = Parser::KeywordList();
+	} else {
+		result->entries = ExtendedGrammarKeywords(*grammar);
+	}
 	return std::move(result);
 }
 
