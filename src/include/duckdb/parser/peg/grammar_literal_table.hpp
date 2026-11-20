@@ -26,11 +26,11 @@ public:
 		return cache_id;
 	}
 
-	//! Calls fun(info) for every literal in the table
+	//! Calls fun(text, info) for every literal in the table
 	template <class FUN>
 	void ForEachLiteral(FUN &&fun) const {
 		for (auto &entry : literals) {
-			fun(entry.second);
+			fun(entry.first, entry.second);
 		}
 	}
 

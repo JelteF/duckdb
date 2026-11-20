@@ -1,0 +1,61 @@
+# name: test/extension/test_grammar_extension_keywords.test
+# description: duckdb_keywords() includes the keywords of the active grammar extensions
+# group: [extension]
+
+require skip_reload
+
+statement ok
+LOAD '{BUILD_DIRECTORY}/test/extension/loadable_grammar_extension_demo.duckdb_extension';
+
+query I
+SELECT count(*) FROM duckdb_keywords() WHERE keyword_name IN ('begin_demo_block', 'end_demo_block', 'wrapped', 'extend');
+----
+0
+
+statement ok
+SET active_grammar_extensions = ['block_statement_syntax', 'wrapped_transform_nodes', 'pipe_query_syntax'];
+
+# words that only appear as literals in the grammar extension's rules are accepted as identifiers
+query TT
+SELECT keyword_name, keyword_category FROM duckdb_keywords() WHERE keyword_name LIKE '%demo_block' ORDER BY ALL;
+----
+begin_demo_block	unreserved
+end_demo_block	unreserved
+
+# keywords that the grammar extension registers in a keyword category keep that category
+query TT
+SELECT keyword_name, keyword_category FROM duckdb_keywords() WHERE keyword_name IN ('wrapped', 'extend', 'aggregate') ORDER BY ALL;
+----
+aggregate	reserved
+extend	reserved
+wrapped	unreserved
+
+# the built-in keywords are still there, and none are duplicated
+query T
+SELECT keyword_category FROM duckdb_keywords() WHERE keyword_name = 'select';
+----
+reserved
+
+query I
+SELECT count(*) FROM (SELECT keyword_name, keyword_category FROM duckdb_keywords() GROUP BY ALL HAVING count(*) > 1);
+----
+0
+
+# literal-only words of the base grammar are not reported
+query I
+SELECT count(*) FROM duckdb_keywords() WHERE keyword_name = 'repository';
+----
+0
+
+statement ok
+SET active_grammar_extensions = [];
+
+query I
+SELECT count(*) FROM duckdb_keywords() WHERE keyword_name IN ('begin_demo_block', 'end_demo_block', 'wrapped', 'extend');
+----
+0
+
+query TT
+SELECT keyword_name, keyword_category FROM duckdb_keywords() WHERE keyword_name = 'aggregate';
+----
+aggregate	unreserved

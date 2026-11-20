@@ -167,7 +167,7 @@ public:
 		if (SupportsStringLiteral()) {
 			first_set.class_mask |= MatcherTokenClass::STRING;
 		}
-		table.ForEachLiteral([&](const LiteralInfo &info) {
+		table.ForEachLiteral([&](const string &, const LiteralInfo &info) {
 			if (info.IsKeyword() && info.HasAnyFlags(identifier_mask)) {
 				first_set.AddLiteral(info.LiteralId());
 			}
