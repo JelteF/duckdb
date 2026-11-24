@@ -1,0 +1,46 @@
+# name: test/optimizer/joins/wide_nested_build_side.test
+# description: The build side estimate uses the size of LIST and ARRAY columns, so a few rows with long lists are probed
+# group: [joins]
+
+statement ok
+CREATE TABLE keys AS SELECT range AS id FROM range(40000);
+
+statement ok
+CREATE TABLE long_lists AS SELECT range AS id, range(range % 400) AS elements FROM range(10000);
+
+statement ok
+CREATE TABLE short_lists AS SELECT range AS id, [range] AS elements FROM range(10000);
+
+statement ok
+CREATE TABLE arrays AS SELECT range AS id, [range::FLOAT for x in range(100)]::FLOAT[100] AS elements FROM range(10000);
+
+# the probe side is serialized first
+query II
+EXPLAIN (FORMAT json) SELECT k.id, l.elements FROM keys k JOIN long_lists l USING (id);
+----
+physical_plan	<REGEX>:.*long_lists.*keys.*
+
+# the list length is also found through projections and filters
+query II
+EXPLAIN (FORMAT json)
+SELECT k.id, l.list_elements
+FROM keys k
+JOIN (SELECT id + 1 AS id, elements AS list_elements FROM long_lists WHERE id % 2 = 0) l USING (id);
+----
+physical_plan	<REGEX>:.*long_lists.*keys.*
+
+query II
+EXPLAIN (FORMAT json) SELECT k.id, a.elements FROM keys k JOIN arrays a USING (id);
+----
+physical_plan	<REGEX>:.*arrays.*keys.*
+
+# short lists keep the default estimate, so the smaller table is still built
+query II
+EXPLAIN (FORMAT json) SELECT k.id, s.elements FROM keys k JOIN short_lists s USING (id);
+----
+physical_plan	<REGEX>:.*keys.*short_lists.*
+
+query I
+SELECT sum(len(l.elements)) FROM keys k JOIN long_lists l USING (id);
+----
+1995000

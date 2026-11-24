@@ -20,6 +20,7 @@
 #include "duckdb/planner/operator/logical_cross_product.hpp"
 #include "duckdb/planner/operator/logical_projection.hpp"
 #include "duckdb/main/settings.hpp"
+#include "duckdb/storage/statistics/list_stats.hpp"
 
 namespace duckdb {
 
@@ -169,16 +170,118 @@ static idx_t MaxDynamicFilterTargetCardinality(LogicalComparisonJoin &join, cons
 	return max_target_cardinality;
 }
 
-BuildSize BuildProbeSideOptimizer::GetBuildSizes(const LogicalOperator &op, const idx_t lhs_cardinality,
-                                                 const idx_t rhs_cardinality) {
+//! Follows a column down to the scan that produces it, through operators that pass their children's columns through
+static optional_ptr<LogicalGet> FindColumnScan(LogicalOperator &op, const ColumnBinding &binding,
+                                               ColumnBinding &scan_binding) {
+	switch (op.type) {
+	case LogicalOperatorType::LOGICAL_GET: {
+		auto &get = op.Cast<LogicalGet>();
+		if (get.table_index != binding.table_index) {
+			return nullptr;
+		}
+		scan_binding = binding;
+		return &get;
+	}
+	case LogicalOperatorType::LOGICAL_PROJECTION: {
+		auto &projection = op.Cast<LogicalProjection>();
+		if (projection.table_index != binding.table_index) {
+			return nullptr;
+		}
+		auto &expr = *projection.expressions[binding.column_index];
+		if (expr.GetExpressionClass() != ExpressionClass::BOUND_COLUMN_REF) {
+			return nullptr;
+		}
+		return FindColumnScan(*op.children[0], expr.Cast<BoundColumnRefExpression>().Binding(), scan_binding);
+	}
+	case LogicalOperatorType::LOGICAL_FILTER:
+	case LogicalOperatorType::LOGICAL_ORDER_BY:
+	case LogicalOperatorType::LOGICAL_LIMIT:
+	case LogicalOperatorType::LOGICAL_TOP_N:
+	case LogicalOperatorType::LOGICAL_SAMPLE:
+	case LogicalOperatorType::LOGICAL_COMPARISON_JOIN:
+	case LogicalOperatorType::LOGICAL_ANY_JOIN:
+	case LogicalOperatorType::LOGICAL_DELIM_JOIN:
+	case LogicalOperatorType::LOGICAL_CROSS_PRODUCT:
+		for (auto &child : op.children) {
+			auto get = FindColumnScan(*child, binding, scan_binding);
+			if (get) {
+				return get;
+			}
+		}
+		return nullptr;
+	default:
+		return nullptr;
+	}
+}
+
+idx_t BuildProbeSideOptimizer::EstimateNestedWidth(LogicalOperator &op, const ColumnBinding &binding,
+                                                   const LogicalType &type) const {
+	switch (type.InternalType()) {
+	case PhysicalType::ARRAY: {
+		auto child_type = ArrayType::GetChildType(type).InternalType();
+		if (!TypeIsConstantSize(child_type)) {
+			return 0;
+		}
+		return ArrayType::GetSize(type) * GetTypeIdSize(child_type);
+	}
+	case PhysicalType::LIST: {
+		auto child_type = ListType::GetChildType(type).InternalType();
+		if (!TypeIsConstantSize(child_type)) {
+			return 0;
+		}
+		ColumnBinding scan_binding;
+		auto get = FindColumnScan(op, binding, scan_binding);
+		if (!get || !get->bind_data || (!get->function.statistics && !get->function.statistics_extended)) {
+			return 0;
+		}
+		auto &column_index = get->GetColumnIndex(scan_binding);
+		if (column_index.IsVirtualColumn()) {
+			return 0;
+		}
+		unique_ptr<BaseStatistics> stats;
+		if (get->function.statistics_extended) {
+			TableFunctionGetStatisticsInput input(get->bind_data.get(), column_index);
+			stats = get->function.statistics_extended(context, input);
+		} else {
+			stats = get->function.statistics(context, get->bind_data.get(), column_index.GetPrimaryIndex());
+		}
+		if (!stats || stats->GetStatsType() != StatisticsType::LIST_STATS) {
+			return 0;
+		}
+		auto total_length = ListStats::TotalListLength(*stats);
+		auto scan_cardinality = get->EstimateSourceCardinality(context);
+		if (!total_length.IsValid() || scan_cardinality == 0) {
+			return 0;
+		}
+		return total_length.GetIndex() / scan_cardinality * GetTypeIdSize(child_type);
+	}
+	default:
+		return 0;
+	}
+}
+
+vector<idx_t> BuildProbeSideOptimizer::EstimateNestedWidths(LogicalOperator &op) const {
+	auto bindings = op.GetColumnBindings();
+	if (bindings.size() != op.types.size()) {
+		return {};
+	}
+	vector<idx_t> result;
+	for (idx_t col_idx = 0; col_idx < bindings.size(); col_idx++) {
+		result.push_back(EstimateNestedWidth(op, bindings[col_idx], op.types[col_idx]));
+	}
+	return result;
+}
+
+BuildSize BuildProbeSideOptimizer::GetBuildSizes(LogicalOperator &op, const idx_t lhs_cardinality,
+                                                 const idx_t rhs_cardinality) const {
 	BuildSize ret;
 	switch (op.type) {
 	case LogicalOperatorType::LOGICAL_COMPARISON_JOIN:
 	case LogicalOperatorType::LOGICAL_CROSS_PRODUCT:
 	case LogicalOperatorType::LOGICAL_ANY_JOIN:
 	case LogicalOperatorType::LOGICAL_DELIM_JOIN: {
-		ret.left_side = GetBuildSize(op.children[0]->types, lhs_cardinality);
-		ret.right_side = GetBuildSize(op.children[1]->types, rhs_cardinality);
+		ret.left_side = GetBuildSize(op.children[0]->types, lhs_cardinality, EstimateNestedWidths(*op.children[0]));
+		ret.right_side = GetBuildSize(op.children[1]->types, rhs_cardinality, EstimateNestedWidths(*op.children[1]));
 		return ret;
 	}
 	default:
@@ -187,7 +290,8 @@ BuildSize BuildProbeSideOptimizer::GetBuildSizes(const LogicalOperator &op, cons
 	return ret;
 }
 
-double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const idx_t cardinality) {
+double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const idx_t cardinality,
+                                             const vector<idx_t> &nested_widths) {
 	// Row width in the hash table
 	types.push_back(LogicalType::HASH);
 	auto tuple_layout = TupleDataLayout();
@@ -203,7 +307,7 @@ double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const id
 				break;
 			case PhysicalType::LIST:
 			case PhysicalType::ARRAY:
-				row_width += 32;
+				row_width += NESTED_WIDTH_PENALTY;
 				break;
 			default:
 				break;
@@ -214,6 +318,10 @@ double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const id
 
 			return visited_type;
 		});
+	}
+	// The fixed penalty stays a lower bound, so that short lists don't change the plans picked without statistics
+	for (auto nested_width : nested_widths) {
+		row_width += MaxValue<idx_t>(nested_width, NESTED_WIDTH_PENALTY) - NESTED_WIDTH_PENALTY;
 	}
 
 	// There is also a cost of NextPowerOfTwo(count * 2) * sizeof(ht_entry_t) per tuple in the hash table
