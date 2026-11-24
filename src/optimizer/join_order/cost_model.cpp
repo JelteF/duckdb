@@ -33,17 +33,26 @@ void CostModel::InitializeRecursiveMemory(ClientContext &context, RelationManage
 	}
 	recursive_relations = relations;
 	memory_budget = static_cast<double>(BufferManager::GetBufferManager(context).GetOperatorMemoryLimit());
+	for (idx_t i = 0; i < relations.NumRelations(); i++) {
+		auto &relation = relations.GetRelation(RelationIndex(i));
+		relation_nested_widths.push_back(BuildProbeSideOptimizer::EstimateNestedWidths(context, relation.op));
+	}
 }
 
 double CostModel::GetBuildSize(const DPJoinNode &node) {
 	auto entry = row_widths.find(node.set);
 	if (entry == row_widths.end()) {
 		vector<LogicalType> types;
+		vector<idx_t> nested_widths;
 		for (idx_t i = 0; i < node.set.count; i++) {
-			auto &relation = recursive_relations->GetRelation(node.set.relations[i]);
+			auto relation_idx = node.set.relations[i];
+			auto &relation = recursive_relations->GetRelation(relation_idx);
 			types.insert(types.end(), relation.op.types.begin(), relation.op.types.end());
+			auto &relation_widths = relation_nested_widths[relation_idx.index];
+			nested_widths.insert(nested_widths.end(), relation_widths.begin(), relation_widths.end());
 		}
-		entry = row_widths.emplace(node.set, BuildProbeSideOptimizer::GetBuildSize(std::move(types), 1)).first;
+		entry = row_widths.emplace(node.set, BuildProbeSideOptimizer::GetBuildSize(std::move(types), 1, nested_widths))
+		            .first;
 	}
 	return entry->second * node.cardinality.GetDouble();
 }

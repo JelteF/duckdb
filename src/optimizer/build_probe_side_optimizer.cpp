@@ -20,6 +20,10 @@
 #include "duckdb/planner/operator/logical_cross_product.hpp"
 #include "duckdb/planner/operator/logical_projection.hpp"
 #include "duckdb/main/settings.hpp"
+#include "duckdb/storage/statistics/array_stats.hpp"
+#include "duckdb/storage/statistics/list_stats.hpp"
+#include "duckdb/storage/statistics/string_stats.hpp"
+#include "duckdb/storage/statistics/struct_stats.hpp"
 
 namespace duckdb {
 
@@ -169,16 +173,192 @@ static idx_t MaxDynamicFilterTargetCardinality(LogicalComparisonJoin &join, cons
 	return max_target_cardinality;
 }
 
-BuildSize BuildProbeSideOptimizer::GetBuildSizes(const LogicalOperator &op, const idx_t lhs_cardinality,
-                                                 const idx_t rhs_cardinality) {
+//! Follows a column down to the scan that produces it, through operators that pass their children's columns through
+static optional_ptr<LogicalGet> FindColumnScan(LogicalOperator &op, const ColumnBinding &binding,
+                                               ColumnBinding &scan_binding) {
+	switch (op.type) {
+	case LogicalOperatorType::LOGICAL_GET: {
+		auto &get = op.Cast<LogicalGet>();
+		if (get.table_index != binding.table_index) {
+			return nullptr;
+		}
+		scan_binding = binding;
+		return &get;
+	}
+	case LogicalOperatorType::LOGICAL_PROJECTION: {
+		auto &projection = op.Cast<LogicalProjection>();
+		if (projection.table_index != binding.table_index) {
+			return nullptr;
+		}
+		auto &expr = *projection.expressions[binding.column_index];
+		if (expr.GetExpressionClass() != ExpressionClass::BOUND_COLUMN_REF) {
+			return nullptr;
+		}
+		return FindColumnScan(*op.children[0], expr.Cast<BoundColumnRefExpression>().Binding(), scan_binding);
+	}
+	case LogicalOperatorType::LOGICAL_FILTER:
+	case LogicalOperatorType::LOGICAL_ORDER_BY:
+	case LogicalOperatorType::LOGICAL_LIMIT:
+	case LogicalOperatorType::LOGICAL_TOP_N:
+	case LogicalOperatorType::LOGICAL_SAMPLE:
+	case LogicalOperatorType::LOGICAL_COMPARISON_JOIN:
+	case LogicalOperatorType::LOGICAL_ANY_JOIN:
+	case LogicalOperatorType::LOGICAL_DELIM_JOIN:
+	case LogicalOperatorType::LOGICAL_CROSS_PRODUCT:
+		for (auto &child : op.children) {
+			auto get = FindColumnScan(*child, binding, scan_binding);
+			if (get) {
+				return get;
+			}
+		}
+		return nullptr;
+	default:
+		return nullptr;
+	}
+}
+
+static bool EstimateElementsSize(const LogicalType &type, optional_ptr<const BaseStatistics> stats, double count,
+                                 double &size);
+
+//! Estimates the total size of count values, from their statistics if the type has a variable size
+static bool EstimateValuesSize(const LogicalType &type, optional_ptr<const BaseStatistics> stats, double count,
+                               double &size) {
+	auto physical_type = type.InternalType();
+	if (TypeIsConstantSize(physical_type)) {
+		size = count * static_cast<double>(GetTypeIdSize(physical_type));
+		return true;
+	}
+	switch (physical_type) {
+	case PhysicalType::VARCHAR: {
+		if (!stats || stats->GetStatsType() != StatisticsType::STRING_STATS) {
+			return false;
+		}
+		auto total_length = StringStats::TotalStringLength(*stats);
+		if (!total_length.IsValid()) {
+			return false;
+		}
+		size = count * sizeof(string_t) + static_cast<double>(total_length.GetIndex());
+		return true;
+	}
+	case PhysicalType::LIST:
+	case PhysicalType::ARRAY: {
+		if (!EstimateElementsSize(type, stats, count, size)) {
+			return false;
+		}
+		size += count * sizeof(list_entry_t);
+		return true;
+	}
+	case PhysicalType::STRUCT: {
+		if (stats && stats->GetStatsType() != StatisticsType::STRUCT_STATS) {
+			return false;
+		}
+		auto &child_types = StructType::GetChildTypes(type);
+		size = 0;
+		for (idx_t child_idx = 0; child_idx < child_types.size(); child_idx++) {
+			optional_ptr<const BaseStatistics> child_stats;
+			if (stats) {
+				child_stats = StructStats::GetChildStats(*stats, child_idx);
+			}
+			double child_size;
+			if (!EstimateValuesSize(child_types[child_idx].second, child_stats, count, child_size)) {
+				return false;
+			}
+			size += child_size;
+		}
+		return true;
+	}
+	default:
+		return false;
+	}
+}
+
+//! Estimates the total size of the elements of count LIST or ARRAY values
+static bool EstimateElementsSize(const LogicalType &type, optional_ptr<const BaseStatistics> stats, double count,
+                                 double &size) {
+	if (type.InternalType() == PhysicalType::ARRAY) {
+		if (stats && stats->GetStatsType() != StatisticsType::ARRAY_STATS) {
+			return false;
+		}
+		auto child_stats = stats ? &ArrayStats::GetChildStats(*stats) : nullptr;
+		auto child_count = count * static_cast<double>(ArrayType::GetSize(type));
+		return EstimateValuesSize(ArrayType::GetChildType(type), child_stats, child_count, size);
+	}
+	D_ASSERT(type.InternalType() == PhysicalType::LIST);
+	if (!stats || stats->GetStatsType() != StatisticsType::LIST_STATS) {
+		return false;
+	}
+	auto total_length = ListStats::TotalListLength(*stats);
+	if (!total_length.IsValid()) {
+		return false;
+	}
+	return EstimateValuesSize(ListType::GetChildType(type), ListStats::GetChildStats(*stats),
+	                          static_cast<double>(total_length.GetIndex()), size);
+}
+
+static unique_ptr<BaseStatistics> GetScanColumnStatistics(ClientContext &context, LogicalGet &get,
+                                                          const ColumnIndex &column_index) {
+	if (!get.bind_data || column_index.IsVirtualColumn()) {
+		return nullptr;
+	}
+	if (get.function.statistics_extended) {
+		TableFunctionGetStatisticsInput input(get.bind_data.get(), column_index);
+		return get.function.statistics_extended(context, input);
+	}
+	if (get.function.statistics) {
+		return get.function.statistics(context, get.bind_data.get(), column_index.GetPrimaryIndex());
+	}
+	return nullptr;
+}
+
+//! Estimated bytes per row of the elements of a LIST or ARRAY column, or 0 if unknown
+static idx_t EstimateNestedWidth(ClientContext &context, LogicalOperator &op, const ColumnBinding &binding,
+                                 const LogicalType &type) {
+	if (type.InternalType() != PhysicalType::LIST && type.InternalType() != PhysicalType::ARRAY) {
+		return 0;
+	}
+	double size;
+	// a fixed-size ARRAY needs no statistics
+	if (EstimateElementsSize(type, nullptr, 1, size)) {
+		return static_cast<idx_t>(size);
+	}
+	ColumnBinding scan_binding;
+	auto get = FindColumnScan(op, binding, scan_binding);
+	if (!get) {
+		return 0;
+	}
+	auto stats = GetScanColumnStatistics(context, *get, get->GetColumnIndex(scan_binding));
+	auto scan_cardinality = get->EstimateSourceCardinality(context);
+	if (!stats || scan_cardinality == 0 ||
+	    !EstimateElementsSize(type, stats.get(), static_cast<double>(scan_cardinality), size)) {
+		return 0;
+	}
+	return static_cast<idx_t>(size / static_cast<double>(scan_cardinality));
+}
+
+vector<idx_t> BuildProbeSideOptimizer::EstimateNestedWidths(ClientContext &context, LogicalOperator &op) {
+	vector<idx_t> result(op.types.size(), 0);
+	auto bindings = op.GetColumnBindings();
+	if (bindings.size() != op.types.size()) {
+		return result;
+	}
+	for (idx_t col_idx = 0; col_idx < bindings.size(); col_idx++) {
+		result[col_idx] = EstimateNestedWidth(context, op, bindings[col_idx], op.types[col_idx]);
+	}
+	return result;
+}
+
+BuildSize BuildProbeSideOptimizer::GetBuildSizes(LogicalOperator &op, const idx_t lhs_cardinality,
+                                                 const idx_t rhs_cardinality) const {
 	BuildSize ret;
 	switch (op.type) {
 	case LogicalOperatorType::LOGICAL_COMPARISON_JOIN:
 	case LogicalOperatorType::LOGICAL_CROSS_PRODUCT:
 	case LogicalOperatorType::LOGICAL_ANY_JOIN:
 	case LogicalOperatorType::LOGICAL_DELIM_JOIN: {
-		ret.left_side = GetBuildSize(op.children[0]->types, lhs_cardinality);
-		ret.right_side = GetBuildSize(op.children[1]->types, rhs_cardinality);
+		ret.left_side =
+		    GetBuildSize(op.children[0]->types, lhs_cardinality, EstimateNestedWidths(context, *op.children[0]));
+		ret.right_side =
+		    GetBuildSize(op.children[1]->types, rhs_cardinality, EstimateNestedWidths(context, *op.children[1]));
 		return ret;
 	}
 	default:
@@ -187,7 +367,8 @@ BuildSize BuildProbeSideOptimizer::GetBuildSizes(const LogicalOperator &op, cons
 	return ret;
 }
 
-double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const idx_t cardinality) {
+double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const idx_t cardinality,
+                                             const vector<idx_t> &nested_widths) {
 	// Row width in the hash table
 	types.push_back(LogicalType::HASH);
 	auto tuple_layout = TupleDataLayout();
@@ -203,7 +384,7 @@ double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const id
 				break;
 			case PhysicalType::LIST:
 			case PhysicalType::ARRAY:
-				row_width += 32;
+				row_width += NESTED_WIDTH_PENALTY;
 				break;
 			default:
 				break;
@@ -214,6 +395,10 @@ double BuildProbeSideOptimizer::GetBuildSize(vector<LogicalType> types, const id
 
 			return visited_type;
 		});
+	}
+	// The fixed penalty stays a lower bound, so that short lists don't change the plans picked without statistics
+	for (auto nested_width : nested_widths) {
+		row_width += MaxValue<idx_t>(nested_width, NESTED_WIDTH_PENALTY) - NESTED_WIDTH_PENALTY;
 	}
 
 	// There is also a cost of NextPowerOfTwo(count * 2) * sizeof(ht_entry_t) per tuple in the hash table

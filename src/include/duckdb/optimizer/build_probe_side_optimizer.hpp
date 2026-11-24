@@ -30,20 +30,25 @@ class BuildProbeSideOptimizer : LogicalOperatorVisitor {
 private:
 	static constexpr idx_t COLUMN_COUNT_PENALTY = 2;
 	static constexpr double PREFER_RIGHT_DEEP_PENALTY = 0.15;
+	//! Bytes per row assumed for the elements of a LIST or ARRAY whose size is unknown
+	static constexpr idx_t NESTED_WIDTH_PENALTY = 32;
 
 public:
 	explicit BuildProbeSideOptimizer(ClientContext &context, LogicalOperator &op);
 	void VisitOperator(LogicalOperator &op) override;
 	void VisitExpression(unique_ptr<Expression> *expression) override {};
 
-	static double GetBuildSize(vector<LogicalType> types, idx_t cardinality);
+	//! nested_widths optionally holds, per column, the estimated bytes per row of a LIST or ARRAY's elements
+	static double GetBuildSize(vector<LogicalType> types, idx_t cardinality, const vector<idx_t> &nested_widths = {});
+	//! Estimates the nested_widths of the columns of op, from the statistics of the scans that produce them
+	static vector<idx_t> EstimateNestedWidths(ClientContext &context, LogicalOperator &op);
 
 private:
 	bool TryFlipJoinChildren(LogicalOperator &op) const;
 	static idx_t ChildHasJoins(LogicalOperator &op);
 	RecursiveProbeSidePreference GetRecursiveProbeSidePreference(const LogicalOperator &op) const;
 
-	static BuildSize GetBuildSizes(const LogicalOperator &op, idx_t lhs_cardinality, idx_t rhs_cardinality);
+	BuildSize GetBuildSizes(LogicalOperator &op, idx_t lhs_cardinality, idx_t rhs_cardinality) const;
 
 private:
 	ClientContext &context;
