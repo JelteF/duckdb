@@ -5,6 +5,10 @@
 #include "duckdb/planner/planner.hpp"
 #include "test_helpers.hpp"
 #include "duckdb/parser/parser.hpp"
+#include "duckdb/planner/operator/logical_get.hpp"
+#include "duckdb/common/serializer/binary_serializer.hpp"
+#include "duckdb/common/serializer/binary_deserializer.hpp"
+#include "duckdb/common/serializer/memory_stream.hpp"
 
 #include <map>
 #include <set>
@@ -154,4 +158,62 @@ TEST_CASE("Test logical_insert with catalog", "[serialization]") {
 
 TEST_CASE("Test logical_update with catalog", "[serialization]") {
 	test_helper_multi_db("UPDATE new_db.main.tbl SET foo=42", {"CREATE TABLE new_db.main.tbl (foo INTEGER)"});
+}
+
+static optional_ptr<LogicalGet> FindLogicalGet(LogicalOperator &op) {
+	if (op.type == LogicalOperatorType::LOGICAL_GET) {
+		return op.Cast<LogicalGet>();
+	}
+	for (auto &child : op.children) {
+		auto result = FindLogicalGet(*child);
+		if (result) {
+			return result;
+		}
+	}
+	return nullptr;
+}
+
+// Plans and optimizes the query, round trips the plan through the serializer for the given storage version, and
+// returns how the pushed down table filters of the scan render afterwards
+static string RoundTripTableFilters(Connection &con, const string &sql, const string &storage_version) {
+	con.BeginTransaction();
+	Parser parser(*con.context);
+	parser.ParseQuery(sql);
+	Planner planner(*con.context);
+	planner.CreatePlan(std::move(parser.statements[0]));
+	Optimizer optimizer(*planner.binder, *con.context);
+	auto plan = optimizer.Optimize(std::move(planner.plan));
+
+	MemoryStream stream(Allocator::Get(*con.context));
+	SerializationOptions options;
+	options.storage_compatibility = StorageCompatibility::FromString(storage_version);
+	BinarySerializer::Serialize(*plan, stream, options);
+	stream.Rewind();
+	bound_parameter_map_t parameters;
+	auto new_plan = BinaryDeserializer::Deserialize<LogicalOperator>(stream, *con.context, parameters);
+
+	auto get = FindLogicalGet(*new_plan);
+	REQUIRE(get);
+	auto params = get->ParamsToString();
+	auto filters = params.find("Filters");
+	REQUIRE(filters != params.end());
+	auto result = filters->second;
+	con.Rollback();
+	return result;
+}
+
+TEST_CASE("Test struct field table filter serialization", "[serialization]") {
+	DuckDB db;
+	Connection con(db);
+	REQUIRE_NO_FAIL(con.Query("CREATE TABLE tbl AS SELECT {'a': i::INTEGER, 'b': {'c': i::INTEGER}} AS s "
+	                          "FROM range(10) t(i)"));
+
+	// From v2.0.0 on the expression filter is serialized as is, so the field keeps its name and casing
+	REQUIRE(RoundTripTableFilters(con, "SELECT * FROM tbl WHERE s.a < 2", "latest") == "(struct_extract(s, 'a') < 2)");
+	REQUIRE(RoundTripTableFilters(con, "SELECT * FROM tbl WHERE s.A < 2", "v2.0.0") == "(struct_extract(s, 'A') < 2)");
+	REQUIRE(RoundTripTableFilters(con, "SELECT * FROM tbl WHERE s.b.c > 5", "latest") ==
+	        "(struct_extract(struct_extract(s, 'b'), 'c') > 5)");
+
+	// Older versions only understand the legacy table filters, which address struct fields by index
+	REQUIRE(RoundTripTableFilters(con, "SELECT * FROM tbl WHERE s.a < 2", "v1.5.0") == "(struct_extract_at(s, 1) < 2)");
 }
