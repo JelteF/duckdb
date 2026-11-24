@@ -46,6 +46,8 @@ private:
 	CardinalityEstimator &cardinality_estimator;
 	optional_ptr<RelationManager> recursive_relations;
 	reference_map_t<JoinRelationSet, double> row_widths;
+	//! Per relation, the BuildProbeSideOptimizer::EstimateNestedWidths of its columns
+	vector<vector<idx_t>> relation_nested_widths;
 	double memory_budget = 0;
 };
 

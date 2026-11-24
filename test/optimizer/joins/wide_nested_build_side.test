@@ -14,6 +14,17 @@ CREATE TABLE short_lists AS SELECT range AS id, [range] AS elements FROM range(1
 statement ok
 CREATE TABLE arrays AS SELECT range AS id, [range::FLOAT for x in range(100)]::FLOAT[100] AS elements FROM range(10000);
 
+statement ok
+CREATE TABLE string_lists AS
+SELECT range AS id, [repeat('x', 50) || x::VARCHAR for x in range(10)] AS elements FROM range(10000);
+
+statement ok
+CREATE TABLE struct_lists AS
+SELECT range AS id, [{'a': x, 'b': repeat('y', 30)} for x in range(20)] AS elements FROM range(10000);
+
+statement ok
+CREATE TABLE nested_lists AS SELECT range AS id, [range(20) for x in range(10)] AS elements FROM range(10000);
+
 # the probe side is serialized first
 query II
 EXPLAIN (FORMAT json) SELECT k.id, l.elements FROM keys k JOIN long_lists l USING (id);
@@ -33,6 +44,22 @@ query II
 EXPLAIN (FORMAT json) SELECT k.id, a.elements FROM keys k JOIN arrays a USING (id);
 ----
 physical_plan	<REGEX>:.*arrays.*keys.*
+
+# the elements of lists of variable-size types are estimated from their own statistics
+query II
+EXPLAIN (FORMAT json) SELECT k.id, s.elements FROM keys k JOIN string_lists s USING (id);
+----
+physical_plan	<REGEX>:.*string_lists.*keys.*
+
+query II
+EXPLAIN (FORMAT json) SELECT k.id, s.elements FROM keys k JOIN struct_lists s USING (id);
+----
+physical_plan	<REGEX>:.*struct_lists.*keys.*
+
+query II
+EXPLAIN (FORMAT json) SELECT k.id, n.elements FROM keys k JOIN nested_lists n USING (id);
+----
+physical_plan	<REGEX>:.*nested_lists.*keys.*
 
 # short lists keep the default estimate, so the smaller table is still built
 query II

@@ -40,6 +40,8 @@ public:
 
 	//! nested_widths optionally holds, per column, the estimated bytes per row of a LIST or ARRAY's elements
 	static double GetBuildSize(vector<LogicalType> types, idx_t cardinality, const vector<idx_t> &nested_widths = {});
+	//! Estimates the nested_widths of the columns of op, from the statistics of the scans that produce them
+	static vector<idx_t> EstimateNestedWidths(ClientContext &context, LogicalOperator &op);
 
 private:
 	bool TryFlipJoinChildren(LogicalOperator &op) const;
@@ -47,8 +49,6 @@ private:
 	RecursiveProbeSidePreference GetRecursiveProbeSidePreference(const LogicalOperator &op) const;
 
 	BuildSize GetBuildSizes(LogicalOperator &op, idx_t lhs_cardinality, idx_t rhs_cardinality) const;
-	vector<idx_t> EstimateNestedWidths(LogicalOperator &op) const;
-	idx_t EstimateNestedWidth(LogicalOperator &op, const ColumnBinding &binding, const LogicalType &type) const;
 
 private:
 	ClientContext &context;
