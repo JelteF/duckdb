@@ -574,6 +574,14 @@ TableFilterSet::GetTableFiltersForSerialization(Serializer &serializer) const {
 	for (auto &entry : filters) {
 		auto &expr_filter =
 		    ExpressionFilter::GetExpressionFilter(*entry.second, "TableFilterSet::GetTableFiltersForSerialization");
+		// The legacy format loses information, e.g. a struct field access comes back as struct_extract_at by index
+		// instead of struct_extract by name. Internal table filter functions (dynamic, bloom, prefix range filters)
+		// have no serialization of their own, so filters that contain them still go through the legacy format.
+		if (serializer.ShouldSerialize(StorageVersion::V2_0_0) &&
+		    !ContainsInternalTableFilterFunction(*expr_filter.expr)) {
+			result.emplace(entry.first, expr_filter.Copy());
+			continue;
+		}
 		auto serialized_filter = SerializeExpressionToLegacyFilter(*expr_filter.expr);
 		if (!serialized_filter) {
 			throw SerializationException(
